@@ -9,9 +9,9 @@ from urllib.parse import urljoin
 
 import requests
 
-from ._compat import safe_join
+from werkzeug.utils import safe_join as _safe_join
 
-from .constants import (
+from .config import (
     MERMAID_JS_URL, STYLE_URLS_SOURCE, STYLE_URLS_RES,
     STYLE_ASSET_URLS_RE, STYLE_ASSET_URLS_SUB_FORMAT)
 
@@ -87,7 +87,6 @@ class GitHubAssetManager(ReadmeAssetManager):
         urls = []
         content = r.text
         for style_urls_re in STYLE_URLS_RES:
-            print(re.findall(style_urls_re, content))
             urls.extend(re.findall(style_urls_re, content))
         if not urls:
             print('Warning: no styles found - see https://github.com/joeyespo/'
@@ -184,7 +183,7 @@ class GitHubAssetManager(ReadmeAssetManager):
         # Cache files if all downloads were successful
         cache = {}
         for relname in files:
-            cache[safe_join(self.cache_path, relname)] = files[relname]
+            cache[_safe_join(self.cache_path, relname)] = files[relname]
         if not os.path.exists(self.cache_path):
             os.makedirs(self.cache_path)
         for filename in cache:

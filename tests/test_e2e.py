@@ -179,7 +179,7 @@ class TestMermaidRendering:
     def test_mermaid_js_script_tag(self, grip_app):
         html = _get(grip_app(MERMAID_GRAPH))
         assert 'mermaid.min.js' in html
-        assert 'mermaid.initialize' in html
+        assert 'grip.js' in html
 
 
 # ---------------------------------------------------------------------------

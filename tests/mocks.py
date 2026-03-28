@@ -4,7 +4,7 @@ import requests
 import responses
 from grip import (
     DEFAULT_API_URL, GitHubAssetManager, GitHubRenderer, Grip, StdinReader)
-from grip.constants import MERMAID_JS_URL
+from grip.config import MERMAID_JS_URL
 
 from helpers import USER_CONTEXT, input_file, output_file
 

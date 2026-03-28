@@ -7,13 +7,13 @@ import requests
 try:
     import markdown
     from markdown.extensions.codehilite import CodeHiliteExtension
-    from .vendor.mdx_urlize import UrlizeExtension
+    from .mdx_urlize import UrlizeExtension
 except ImportError:
     markdown = None
     CodeHiliteExtension = None
     UrlizeExtension = None
 
-from .constants import DEFAULT_API_URL
+from .config import DEFAULT_API_URL
 from .patcher import patch
 
 
@@ -102,7 +102,7 @@ class OfflineRenderer(ReadmeRenderer):
                 CodeHiliteExtension as _CodeHiliteExtension)
         _UrlizeExtension = UrlizeExtension
         if _UrlizeExtension is None:
-            from .vendor.mdx_urlize import UrlizeExtension as _UrlizeExtension
+            from .mdx_urlize import UrlizeExtension as _UrlizeExtension
         return _markdown.markdown(text, extensions=[
             'fenced_code',
             _CodeHiliteExtension(css_class='highlight'),

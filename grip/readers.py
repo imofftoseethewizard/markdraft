@@ -6,10 +6,19 @@ import posixpath
 import sys
 from abc import ABCMeta, abstractmethod
 
-from ._compat import safe_join
+from werkzeug.exceptions import NotFound
+from werkzeug.utils import safe_join as _werkzeug_safe_join
 
-from .constants import DEFAULT_FILENAMES, DEFAULT_FILENAME
+from .config import DEFAULT_FILENAMES, DEFAULT_FILENAME
 from .exceptions import ReadmeNotFoundError
+
+
+def _safe_join(directory, *pathnames):
+    """safe_join that raises NotFound instead of returning None."""
+    path = _werkzeug_safe_join(directory, *pathnames)
+    if path is None:
+        raise NotFound()
+    return path
 
 
 class ReadmeReader(object, metaclass=ABCMeta):
@@ -166,7 +175,7 @@ class DirectoryReader(ReadmeReader):
         subpath = posixpath.normpath(subpath)
 
         # Add or remove trailing slash to properly support relative links
-        filename = os.path.normpath(safe_join(self.root_directory, subpath))
+        filename = os.path.normpath(_safe_join(self.root_directory, subpath))
         if os.path.isdir(filename):
             subpath += '/'
 
@@ -187,7 +196,7 @@ class DirectoryReader(ReadmeReader):
             return self.root_filename
 
         # Join for safety and to convert subpath to normalized OS-specific path
-        filename = os.path.normpath(safe_join(self.root_directory, subpath))
+        filename = os.path.normpath(_safe_join(self.root_directory, subpath))
 
         # Check for existence
         if not os.path.exists(filename):

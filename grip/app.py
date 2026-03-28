@@ -20,7 +20,7 @@ from flask import (
 from . import __version__
 from .assets import GitHubAssetManager, ReadmeAssetManager
 from .browser import start_browser_when_ready
-from .constants import (
+from .config import (
     DEFAULT_GRIPHOME, DEFAULT_GRIPURL, STYLE_ASSET_URLS_INLINE_FORMAT)
 from .exceptions import AlreadyRunningError, ReadmeNotFoundError
 from .readers import DirectoryReader
@@ -63,7 +63,7 @@ class Grip(Flask):
         super(Grip, self).__init__(
             __name__, static_url_path=static_url_path,
             instance_path=instance_path, **kwargs)
-        self.config.from_object('grip.settings')
+        self.config.from_object('grip.config')
 
         try:
             self.config.from_pyfile('settings_local.py', silent=True)
@@ -161,6 +161,41 @@ class Grip(Flask):
         return send_from_directory(
             self.assets.cache_path, self.assets.cache_filename(subpath))
 
+    def _build_page_context(self, subpath=None, autorefresh_url=None):
+        """
+        Build the template context dict for a rendered page. This is the
+        core rendering logic, independent of HTTP request handling.
+        """
+        text = self.reader.read(subpath)
+        content = self.renderer.render(text, self.auth)
+
+        favicon = None
+        if self.render_inline:
+            favicon_url = url_for('static', filename='favicon.ico')
+            favicon = self._to_data_url(favicon_url, 'image/x-icon')
+
+        if self.theme == 'dark':
+            data_color_mode = 'dark'
+        else:
+            data_color_mode = 'light'
+
+        return dict(
+            filename=self.reader.filename_for(subpath),
+            title=self.title,
+            content=content,
+            favicon=favicon,
+            user_content=self.renderer.user_content,
+            wide_style=self.render_wide,
+            style_urls=self.assets.style_urls,
+            styles=self.assets.styles,
+            script_urls=self.assets.script_urls,
+            scripts=self.assets.scripts,
+            autorefresh_url=autorefresh_url,
+            data_color_mode=data_color_mode,
+            data_light_theme='light',
+            data_dark_theme='dark',
+        )
+
     def _render_page(self, subpath=None):
         # Normalize the subpath
         normalized = self.reader.normalize_subpath(subpath)
@@ -195,27 +230,23 @@ class Grip(Flask):
                 abort(500)
             raise
 
-        # Inline favicon asset
+        autorefresh_url = (url_for('refresh', subpath=subpath)
+                           if self.autorefresh
+                           else None)
+
         favicon = None
         if self.render_inline:
             favicon_url = url_for('static', filename='favicon.ico')
             favicon = self._to_data_url(favicon_url, 'image/x-icon')
 
-        autorefresh_url = (url_for('refresh', subpath=subpath)
-                           if self.autorefresh
-                           else None)
-
         if self.theme == 'dark':
             data_color_mode = 'dark'
-            data_light_theme = 'light'
-            data_dark_theme = 'dark'
         else:
             data_color_mode = 'light'
-            data_light_theme = 'light'
-            data_dark_theme = 'dark'
 
         return render_template(
-            'index.html', filename=self.reader.filename_for(subpath),
+            'index.html',
+            filename=self.reader.filename_for(subpath),
             title=self.title, content=content, favicon=favicon,
             user_content=self.renderer.user_content,
             wide_style=self.render_wide, style_urls=self.assets.style_urls,
@@ -223,8 +254,8 @@ class Grip(Flask):
             script_urls=self.assets.script_urls,
             scripts=self.assets.scripts,
             autorefresh_url=autorefresh_url,
-            data_color_mode=data_color_mode, data_light_theme=data_light_theme,
-            data_dark_theme=data_dark_theme)
+            data_color_mode=data_color_mode, data_light_theme='light',
+            data_dark_theme='dark')
 
     def _render_refresh(self, subpath=None):
         if not self.autorefresh:
@@ -341,12 +372,16 @@ class Grip(Flask):
     def _inline_scripts(self):
         """
         Downloads scripts from the script URL list, clears it, and adds
-        each script's content to the literal scripts list.
+        each script's content to the literal scripts list. Also inlines
+        grip.js from the static directory.
         """
         for script_url in self.assets.script_urls:
             content = self._download(script_url)
             self.assets.scripts.append(content)
         self.assets.script_urls[:] = []
+        # Inline grip.js
+        grip_js_url = url_for('static', filename='grip.js')
+        self.assets.scripts.append(self._download(grip_js_url))
 
     def _retrieve_styles(self):
         """
@@ -408,15 +443,29 @@ class Grip(Flask):
 
     def render(self, route=None):
         """
-        Renders the application and returns the HTML unicode that would
+        Renders the application and returns the HTML that would
         normally appear when visiting in the browser.
         """
         if route is None:
             route = '/'
-        with self.test_client() as c:
-            response = c.get(route, follow_redirects=True)
-            encoding = getattr(response, 'charset', 'utf-8')
-            return response.data.decode(encoding)
+
+        # Normalize route to subpath (mirror what Flask + _render_page do)
+        subpath = posixpath.normpath(route).lstrip('/')
+        if not subpath or subpath == '.':
+            subpath = None
+
+        # Follow normalization (equivalent to follow_redirects)
+        normalized = self.reader.normalize_subpath(subpath)
+        if normalized is not None and normalized != subpath:
+            subpath = normalized.rstrip('/') or None
+
+        # Ensure styles are retrieved (normally done by before_request)
+        with self.test_request_context(route):
+            self._retrieve_styles()
+            autorefresh_url = (url_for('refresh', subpath=subpath)
+                               if self.autorefresh else None)
+            context = self._build_page_context(subpath, autorefresh_url)
+            return render_template('index.html', **context)
 
     def run(self, host=None, port=None, debug=None, use_reloader=None,
             open_browser=False):
