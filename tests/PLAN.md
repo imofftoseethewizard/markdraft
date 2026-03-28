@@ -2,359 +2,369 @@
 
 ## Approach
 
-Tests are organized into two categories:
+Tests are organized into four files by component:
 
-1. **E2E tests** (`test_e2e.py`) — HTTP requests against a live Flask test
-   client. Assertions on the returned HTML. This is the primary test surface.
-2. **Component tests** (`test_mermaid.py`) — Unit tests for
-   `GripperRenderer` and its mermaid extraction/rendering logic, which is
-   the only complex algorithmic code in the project.
-
-Existing test files (`test_api.py`, `test_cli.py`) are left unchanged.
-They already cover the GitHub API rendering path and basic CLI behavior.
-The new tests cover the offline/mermaid rendering path that gripper
-actually uses.
+1. **`test_server.py`** — E2E tests via HTTP requests to a live
+   `PreviewServer`. Primary test surface.
+2. **`test_export.py`** — Tests for HTML export (inline and CDN-linked).
+3. **`test_cli.py`** — Tests for CLI argument parsing and `main()`.
+4. **`test_components.py`** — Unit tests for readers, asset cache, file
+   watcher, browser helpers, config loading, address parsing, and
+   exceptions.
 
 ### Coverage target
 
-Line coverage of all code reachable through the `GripperRenderer` path
-(the default). Catch-all exception handlers (bare `except Exception`)
-are excluded from the coverage target but are tested where feasible via
-mocking.
+Line coverage of all Python code in `markdraft/`, excepting catch-all
+exception handlers (`except Exception: pass`). JavaScript is not tested
+from Python — rendering correctness is delegated to marked.js,
+highlight.js, and mermaid.js.
 
 ### Semantic dimensions
 
-The input space is decomposed into orthogonal dimensions. Each dimension
-is sampled across its equivalence classes. Correlated dimensions that
-interact are tested combinatorially where the interaction could cause
-bugs; independent dimensions are tested in isolation.
+The input space decomposes into orthogonal dimensions. Each dimension is
+sampled across its equivalence classes. Correlated dimensions that
+interact are tested combinatorially; independent dimensions are tested
+in isolation.
 
 ---
 
-## E2E Tests — `test_e2e.py`
+## Cleanup
 
-Every test creates a `Grip` app with `GripperRenderer` (the default),
-a `GitHubAssetManagerMock`, and uses `app.test_client()` for HTTP GETs.
-Assertions inspect the response status code and parse/search the HTML body.
+Delete legacy test artifacts from the grip era:
 
-### Fixtures
+| Path | Reason |
+|------|--------|
+| `tests/output/` | Unused — saved HTML from old GitHub API renderer |
+| `tests/input/github.md` | Duplicate of gfm-test.md |
+| `tests/input/simple.md` | Only used by deleted GitHubRenderer tests |
+| `tests/input/zero.md` | Only used by deleted GitHubRenderer tests |
+| `tests/helpers.py` | Imported by nobody |
+| `tests/mermaid_test.md` | From the mmdc era, no tests reference it |
+| `tests/PLAN.md` | Replaced by this file |
 
-```
-fixture: grip_app(tmp_path, markdown_text, **kwargs)
-  Creates a Grip app with a TextReader for the given markdown,
-  GripperRenderer, and GitHubAssetManagerMock.
-  kwargs forwarded to Grip() (render_wide, render_inline, title,
-  autorefresh, quiet, theme).
-  Returns Flask test_client.
+Keep:
 
-fixture: grip_dir_app(tmp_path, files_dict, **kwargs)
-  Creates a Grip app with a DirectoryReader pointed at tmp_path.
-  files_dict is {filename: content} written to tmp_path.
-  Returns Flask test_client.
-```
+| Path | Reason |
+|------|--------|
+| `tests/input/default/README.md` | Used by DirectoryReader tests |
+| `tests/input/gfm-test.md` | Used by DirectoryReader tests |
+| `tests/input/img.png` | Used by is_binary() test |
 
-### Dimension 1: Markdown content (orthogonal to app config)
-
-These tests verify the rendered `<article>` content is correct for
-various markdown inputs. Each test GETs `/` and inspects the HTML
-inside `#grip-content`.
-
-| ID  | Test                     | Input                                     | Assertions                                             |
-|-----|--------------------------|-------------------------------------------|--------------------------------------------------------|
-| E1  | `test_empty_document`    | `""`                                      | 200, `#grip-content` exists, article is empty          |
-| E2  | `test_plain_text`        | `"Hello world"`                           | `<p>Hello world</p>` in content                        |
-| E3  | `test_atx_headers`       | `# H1\n## H2\n### H3`                     | `<h1`, `<h2`, `<h3` present with correct text          |
-| E4  | `test_setext_headers`    | `H1\n===\n\nH2\n---`                      | `<h1` and `<h2` present                                |
-| E5  | `test_emphasis`          | `*em* **strong** ***both***`              | `<em>`, `<strong>` tags                                |
-| E6  | `test_inline_code`       | `` `code` ``                              | `<code>code</code>`                                    |
-| E7  | `test_fenced_code_block` | ` ```python\nprint(1)\n``` `              | `<code` with content, NOT treated as mermaid           |
-| E8  | `test_links`             | `[text](http://example.com)`              | `<a href="http://example.com">text</a>`                |
-| E9  | `test_images`            | `![alt](img.png)`                         | `<img` with `alt="alt"` and `src` containing `img.png` |
-| E10 | `test_unordered_list`    | `- a\n- b\n- c`                           | `<ul>` with 3 `<li>`                                   |
-| E11 | `test_ordered_list`      | `1. a\n2. b`                              | `<ol>` with 2 `<li>`                                   |
-| E12 | `test_blockquote`        | `> quoted`                                | `<blockquote>` with content                            |
-| E13 | `test_horizontal_rule`   | `text\n\n---\n\ntext`                     | `<hr` present                                          |
-| E14 | `test_table`             | GFM table with header and rows            | `<table>`, `<th>`, `<td>`                              |
-| E15 | `test_unicode_content`   | `"Emoji: \U0001f600 Accents: cafe\u0301"` | Characters preserved in output                         |
-| E16 | `test_html_passthrough`  | `<div class="custom">text</div>`          | div preserved in output                                |
-| E17 | `test_autolinked_url`    | `Visit http://example.com today`          | `<a href="http://example.com">` (via UrlizeExtension)  |
-| E18 | `test_toc_header_ids`    | `# Section One`                           | `id=` attribute on `<h1>` (via toc extension)          |
-
-### Dimension 2: Mermaid rendering (orthogonal to other markdown)
-
-Tests that mermaid fenced code blocks produce SVG diagrams.
-
-| ID  | Test                              | Input                                       | Assertions                                                                                 |
-|-----|-----------------------------------|---------------------------------------------|--------------------------------------------------------------------------------------------|
-| E20 | `test_single_mermaid_block`       | One ` ```mermaid ` block                    | `<div class="mermaid-diagram">` present, `<svg` present, no placeholder text in output     |
-| E21 | `test_two_mermaid_blocks`         | Two mermaid blocks with text between        | Two `mermaid-diagram` divs, two `<svg` elements, surrounding `<p>` text preserved          |
-| E22 | `test_mermaid_with_regular_code`  | One mermaid block + one ` ```python ` block | One `mermaid-diagram`, python code block NOT rendered as SVG                               |
-| E23 | `test_mermaid_graph_lr`           | `graph LR\n  A-->B`                         | SVG output, no errors                                                                      |
-| E24 | `test_mermaid_sequence_diagram`   | `sequenceDiagram\n  A->>B: Hello`           | SVG output                                                                                 |
-| E25 | `test_mermaid_flowchart`          | `flowchart TD\n  A-->B`                     | SVG output                                                                                 |
-| E26 | `test_no_mermaid_blocks`          | Regular markdown only                       | No `mermaid-diagram` in output, no placeholder strings                                     |
-| E27 | `test_mermaid_surrounded_by_text` | Paragraph, mermaid, paragraph               | `<p>` before and after the `<div class="mermaid-diagram">`, mermaid div NOT inside a `<p>` |
-
-### Dimension 3: Page structure and template variables
-
-These test the full HTML page structure, not just the content. They
-verify template rendering with different `Grip()` constructor args.
-
-| ID  | Test                               | Config                               | Assertions on full HTML                                                                                                  |
-|-----|------------------------------------|--------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| E30 | `test_page_structure_default`      | defaults                             | `<!DOCTYPE html>`, `<html`, `data-color-mode`, `<title>` contains filename, `class="markdown-body"`, `id="grip-content"` |
-| E31 | `test_page_title_from_filename`    | path to `README.md`                  | `<title>README.md - Grip</title>`                                                                                        |
-| E32 | `test_page_title_override`         | `title="My Title"`                   | `<title>My Title</title>`                                                                                                |
-| E33 | `test_page_title_none`             | TextReader with no filename          | `<title> - Grip</title>` (empty filename)                                                                                |
-| E34 | `test_theme_light`                 | `theme='light'`                      | `data-color-mode=light`                                                                                                  |
-| E35 | `test_theme_dark`                  | `theme='dark'`                       | `data-color-mode=dark`                                                                                                   |
-| E36 | `test_user_content_layout`         | `user_content=True` on renderer      | `class="pull-discussion-timeline"` present, `id="readme"` absent                                                         |
-| E37 | `test_non_user_content_layout`     | default                              | `id="readme"` present, `pull-discussion-timeline` absent                                                                 |
-| E38 | `test_wide_style`                  | `render_wide=True`                   | CSS class or style for wide rendering present                                                                            |
-| E39 | `test_autorefresh_enabled`         | `autorefresh=True`                   | `data-autorefresh-url` attribute is non-empty                                                                            |
-| E40 | `test_autorefresh_disabled`        | `autorefresh=False`                  | `data-autorefresh-url` attribute is empty                                                                                |
-| E41 | `test_user_content_with_title`     | `user_content=True`, `title="Issue"` | Title appears in `.timeline-comment-header`                                                                              |
-| E42 | `test_user_content_without_title`  | `user_content=True`, no title        | No `.timeline-comment-header` div                                                                                        |
-| E43 | `test_box_header_with_filename`    | path to named file                   | `.Box-header` with `<h2>` containing filename                                                                            |
-| E44 | `test_box_header_without_filename` | TextReader, no filename              | No `.Box-header` div                                                                                                     |
-| E45 | `test_octicons_stylesheet`         | defaults                             | `octicons.css` link present                                                                                              |
-| E46 | `test_favicon_link`                | defaults                             | `<link rel="icon"` present                                                                                               |
-
-### Dimension 4: Correlated — mermaid x page config
-
-Mermaid rendering interacts with some page config options. Sample the
-combinations that could plausibly cause bugs.
-
-| ID  | Test                           | Config                              | Assertions                                         |
-|-----|--------------------------------|-------------------------------------|----------------------------------------------------|
-| E50 | `test_mermaid_dark_theme`      | mermaid block + `theme='dark'`      | SVG present, `data-color-mode=dark`                |
-| E51 | `test_mermaid_user_content`    | mermaid block + `user_content=True` | SVG inside `td.comment-body`, not inside `article` |
-| E52 | `test_mermaid_with_title`      | mermaid block + `title="Diagrams"`  | Title in `<title>`, SVG in content                 |
-| E53 | `test_mermaid_autorefresh_off` | mermaid block + `autorefresh=False` | SVG present, no autorefresh URL                    |
-
-### Dimension 5: Routing and file serving
-
-Tests using `DirectoryReader` to verify path handling, redirects, 404s,
-and binary file serving.
-
-| ID  | Test                            | Request                                           | Assertions                                           |
-|-----|---------------------------------|---------------------------------------------------|------------------------------------------------------|
-| E60 | `test_root_serves_readme`       | `GET /` on dir with README.md                     | 200, content from README.md                          |
-| E61 | `test_explicit_file_path`       | `GET /other.md` where other.md exists             | 200, content from other.md                           |
-| E62 | `test_missing_file_404`         | `GET /nonexistent.md`                             | 404                                                  |
-| E63 | `test_directory_redirect`       | `GET /subdir` where subdir/ exists with README.md | 302 redirect to `/subdir/`                           |
-| E64 | `test_directory_serves_readme`  | `GET /subdir/` with README.md inside              | 200, content from subdir README                      |
-| E65 | `test_binary_file_served_raw`   | `GET /image.png` where image.png exists           | 200, response is binary, content-type is `image/png` |
-| E66 | `test_path_traversal_blocked`   | `GET /../etc/passwd`                              | 404 (werkzeug NotFound)                              |
-| E67 | `test_normalized_path_redirect` | `GET /./README.md/`                               | 302 redirect to normalized path                      |
-
-### Dimension 6: Inline rendering and export path
-
-Tests the `render_inline=True` path which inlines styles and favicon.
-
-| ID  | Test                             | Config                               | Assertions                                                          |
-|-----|----------------------------------|--------------------------------------|---------------------------------------------------------------------|
-| E70 | `test_render_inline_favicon`     | `render_inline=True`                 | `<link rel="icon" href="data:image/x-icon;base64,`                  |
-| E71 | `test_render_not_inline_favicon` | `render_inline=False`                | `<link rel="icon" href="` pointing to static URL, not data:         |
-| E72 | `test_export_produces_html`      | `grip.export()` with tmp output file | File written, contains `<!DOCTYPE html>`, contains rendered content |
-| E73 | `test_export_inline_default`     | `grip.export()` default              | Styles are inlined (no external `<link>` stylesheet URLs)           |
-| E74 | `test_export_no_inline`          | `grip.export(render_inline=False)`   | External `<link>` stylesheet URLs present                           |
-
-### Dimension 7: Autorefresh SSE
-
-Test the Server-Sent Events endpoint for content refresh.
-
-| ID  | Test                             | Setup               | Assertions                                                                |
-|-----|----------------------------------|---------------------|---------------------------------------------------------------------------|
-| E80 | `test_refresh_endpoint_exists`   | `autorefresh=True`  | `GET /__/grip/refresh/` returns 200 with `text/event-stream` content type |
-| E81 | `test_refresh_endpoint_disabled` | `autorefresh=False` | `GET /__/grip/refresh/` returns 404                                       |
-|     |                                  |                     |                                                                           |
-
-### Dimension 8: Error handling in render pipeline
-
-| ID  | Test                     | Setup                    | Assertions                                                 |
-|-----|--------------------------|--------------------------|------------------------------------------------------------|
-| E90 | `test_render_empty_file` | Empty markdown file      | 200, empty `#grip-content`                                 |
-| E91 | `test_large_markdown`    | 10,000 lines of markdown | 200, response contains rendered content (no timeout/crash) |
+Create `tests/input/empty/` as an empty directory (for ReadmeNotFoundError
+tests — currently relies on the directory existing).
 
 ---
 
-## Component Tests — `test_mermaid.py`
+## E2E Server Tests — `test_server.py`
 
-Unit tests for `GripperRenderer` internals. These test the extraction
-regex, placeholder substitution, mmdc integration, and fallback behavior
-independently.
+Each test starts a `PreviewServer` on a random port using the
+`preview_server` / `text_server` / `dir_server` fixtures from conftest,
+then makes HTTP requests with `urllib.request`.
 
-### Mermaid block extraction (regex)
+### Dimension 1: Page serving (HTML shell)
 
-Tests the `MERMAID_BLOCK_RE` regex and the extraction phase of `render()`.
-These call `render()` with mmdc mocked to return a fixed SVG string, so
-they focus on extraction correctness.
+The server serves an HTML shell for markdown files. The browser fetches
+raw markdown from the API and renders it client-side.
 
-| ID  | Test                                 | Input markdown                         | Assertions                                              |
-|-----|--------------------------------------|----------------------------------------|---------------------------------------------------------|
-| M1  | `test_extract_single_block`          | ` ```mermaid\ngraph LR\n  A-->B\n``` ` | Exactly 1 mmdc call, source is `graph LR\n  A-->B\n`    |
-| M2  | `test_extract_multiple_blocks`       | Two mermaid blocks                     | Exactly 2 mmdc calls with correct sources               |
-| M3  | `test_extract_no_blocks`             | `# Just a heading`                     | Zero mmdc calls                                         |
-| M4  | `test_extract_four_backticks`        | ` ````mermaid\ncontent\n```` `         | 1 call, source is `content\n`                           |
-| M5  | `test_non_mermaid_fenced_block`      | ` ```python\nprint(1)\n``` `           | Zero mmdc calls                                         |
-| M6  | `test_mermaid_case_sensitive`        | ` ```Mermaid\ncontent\n``` `           | Zero mmdc calls (tag is case-sensitive)                 |
-| M7  | `test_empty_mermaid_block`           | ` ```mermaid\n``` `                    | 1 mmdc call with empty string source                    |
-| M8  | `test_mermaid_with_trailing_spaces`  | ` ```mermaid   \ncontent\n``` `        | 1 call (regex allows `\s*` after tag)                   |
-| M9  | `test_mermaid_block_with_html_chars` | Mermaid source containing `<` and `&`  | Source passed to mmdc verbatim (not escaped)            |
-| M10 | `test_mixed_content_ordering`        | Text, mermaid1, text, mermaid2, text   | Output preserves order: `<p>`, SVG1, `<p>`, SVG2, `<p>` |
+| ID | Test | Input | Assertions |
+|----|------|-------|------------|
+| S1 | `test_root_serves_html_shell` | TextReader with markdown | 200, `<!DOCTYPE html>`, `markdraft-content` |
+| S2 | `test_page_has_data_attributes` | TextReader | `data-content-url`, `data-color-mode` present |
+| S3 | `test_page_includes_script_tags` | TextReader | `marked.min.js`, `highlight.min.js`, `mermaid.min.js`, `markdraft.js` |
+| S4 | `test_page_includes_css_links` | TextReader | `github-markdown.css`, `markdraft.css`, `octicons.css` |
 
-### Placeholder substitution
+### Dimension 2: Page title
 
-Tests the post-rendering substitution phase. Uses a mock `OfflineRenderer`
-that returns controlled HTML to test both `<p>`-wrapped and bare
-placeholder handling.
+| ID | Test | Config | Assertion |
+|----|------|--------|-----------|
+| S5 | `test_title_from_filename` | display_filename='README.md' | `README.md - Markdraft` in `<title>` |
+| S6 | `test_title_override` | title='Custom' | `Custom` in `<title>` |
+| S7 | `test_title_no_filename` | display_filename=None | `Markdraft` in `<title>` |
 
-| ID  | Test                               | Mock HTML output               | Assertions                                      |
-|-----|------------------------------------|--------------------------------|-------------------------------------------------|
-| M20 | `test_placeholder_in_p_tags`       | `<p>GRIPPER_MERMAID_0</p>`     | Replaced with SVG div, no `<p>` wrapper remains |
-| M21 | `test_placeholder_bare`            | `<div>GRIPPER_MERMAID_0</div>` | Replaced within the div                         |
-| M22 | `test_placeholder_with_whitespace` | `<p> GRIPPER_MERMAID_0 </p>`   | Regex handles `\s*`, replaced correctly         |
-| M23 | `test_multiple_placeholders`       | Two placeholders in HTML       | Both replaced with correct SVGs (0 and 1 match) |
+### Dimension 3: Theme (orthogonal)
 
-### mmdc integration
+| ID | Test | Config | Assertion |
+|----|------|--------|-----------|
+| S8 | `test_theme_light` | theme='light' | `data-color-mode="light"`, light highlight CSS |
+| S9 | `test_theme_dark` | theme='dark' | `data-color-mode="dark"`, dark highlight CSS |
 
-Tests `_render_mermaid()` with the real `mmdc` binary.
+### Dimension 4: Layout (orthogonal)
 
-| ID  | Test                           | Input                           | Assertions                                                                |
-|-----|--------------------------------|---------------------------------|---------------------------------------------------------------------------|
-| M30 | `test_mmdc_produces_svg`       | `graph LR\n  A-->B`             | Return value starts with `<div class="mermaid-diagram">`, contains `<svg` |
-| M31 | `test_mmdc_svg_is_valid`       | `graph LR\n  A-->B`             | SVG contains `viewBox`, is well-formed XML                                |
-| M32 | `test_mmdc_sequence_diagram`   | `sequenceDiagram\n  A->>B: msg` | Contains `<svg`                                                           |
-| M33 | `test_mmdc_pie_chart`          | `pie\n  "A": 50\n  "B": 50`     | Contains `<svg`                                                           |
-| M34 | `test_mmdc_temp_files_cleaned` | Any valid input                 | After call, no `.mmd` or `.svg` temp files left in tempdir                |
+| ID | Test | Config | Assertion |
+|----|------|--------|-----------|
+| S10 | `test_readme_layout` | default | `id="readme"` present, no `pull-discussion-timeline` |
+| S11 | `test_user_content_layout` | user_content=True | `pull-discussion-timeline` present, no `id="readme"` |
+| S12 | `test_user_content_with_title` | user_content=True, title='Issue' | `timeline-comment-header` with title |
+| S13 | `test_user_content_without_title` | user_content=True, no title, no filename | No `timeline-comment-header` |
 
-### mmdc failure and fallback
+### Dimension 5: Autorefresh
 
-Tests error paths when mmdc is unavailable or fails.
+| ID | Test | Config | Assertion |
+|----|------|--------|-----------|
+| S14 | `test_autorefresh_url_present` | autorefresh=True | `data-refresh-url` contains `/api/refresh` |
+| S15 | `test_autorefresh_url_empty` | autorefresh=False | `data-refresh-url=""` |
 
-| ID  | Test                                  | Setup                                              | Assertions                                              |
-|-----|---------------------------------------|----------------------------------------------------|---------------------------------------------------------|
-| M40 | `test_mmdc_not_found`                 | Mock subprocess.run to raise FileNotFoundError     | Returns `<pre><code class="language-mermaid">` fallback |
-| M41 | `test_mmdc_nonzero_exit`              | Mock subprocess.run to return returncode=1         | Returns fallback code block                             |
-| M42 | `test_mmdc_timeout`                   | Mock subprocess.run to raise TimeoutExpired        | Returns fallback code block                             |
-| M43 | `test_fallback_escapes_html`          | Mermaid source `A --> B<script>` with mmdc failing | Fallback output contains `&lt;script&gt;` (escaped)     |
-| M44 | `test_fallback_preserves_content`     | Mermaid source with special chars, mmdc failing    | Source text appears in fallback `<code>` block          |
-| M45 | `test_render_continues_after_failure` | Two blocks, first mmdc call fails, second succeeds | First block is fallback, second is SVG                  |
-| M46 | `test_temp_files_cleaned_on_failure`  | mmdc fails                                         | No temp files left behind                               |
+### Dimension 6: JSON content API
 
-### OfflineRenderer base rendering
+| ID | Test | Input | Assertion |
+|----|------|-------|-----------|
+| S16 | `test_api_returns_json` | TextReader('# Hello') | 200, Content-Type: application/json |
+| S17 | `test_api_returns_raw_markdown` | TextReader('# Hello\n\n**bold**') | `{"text": "# Hello\n\n**bold**", ...}` |
+| S18 | `test_api_returns_filename` | display_filename='README.md' | `{"filename": "README.md"}` |
+| S19 | `test_api_subpath` | DirReader with other.md | `/__/api/content/other.md` returns its text |
+| S20 | `test_api_missing_file` | TextReader | 404 for `/__/api/content/nonexistent.md` |
 
-Tests that the base `OfflineRenderer.render()` works correctly (it was
-previously untested and had bugs).
+### Dimension 7: SSE refresh endpoint
 
-| ID  | Test                              | Input                      | Assertions                             |
-|-----|-----------------------------------|----------------------------|----------------------------------------|
-| M50 | `test_offline_render_basic`       | `**bold**`                 | Returns `<p><strong>bold</strong></p>` |
-| M51 | `test_offline_render_fenced_code` | ` ```python\nx=1\n``` `    | Returns `<code` block                  |
-| M52 | `test_offline_render_table`       | GFM table                  | Returns `<table>` with rows            |
-| M53 | `test_offline_render_toc_ids`     | `# Heading`                | `<h1 id="heading">`                    |
-| M54 | `test_offline_render_urlize`      | `Visit http://example.com` | `<a href="http://example.com">`        |
-| M55 | `test_offline_render_codehilite`  | Fenced code with language  | `class="highlight"` in output          |
-| M56 | `test_offline_render_empty`       | `""`                       | Returns `""` (empty string)            |
+| ID | Test | Config | Assertion |
+|----|------|--------|-----------|
+| S21 | `test_refresh_enabled_in_html` | autorefresh=True | Page HTML has non-empty refresh URL |
+| S22 | `test_refresh_disabled_returns_404` | autorefresh=False | 404 on `/__/api/refresh` |
+
+### Dimension 8: Static file serving
+
+| ID | Test | Request | Assertion |
+|----|------|---------|-----------|
+| S23 | `test_serve_bundled_css` | `/__/static/markdraft.css` | 200, `.preview-page` in body |
+| S24 | `test_serve_bundled_js` | `/__/static/markdraft.js` | 200, `marked` in body |
+| S25 | `test_serve_favicon` | `/__/static/favicon.ico` | 200 |
+| S26 | `test_serve_cached_asset` | Place file in cache, request it | 200, correct content |
+| S27 | `test_missing_static_404` | `/__/static/nonexistent.xyz` | 404 |
+| S28 | `test_static_path_traversal` | `/__/static/../../../etc/passwd` | 404 |
+| S29 | `test_static_empty_filename` | `/__/static/` | 404 |
+
+### Dimension 9: Directory routing (correlated with reader)
+
+| ID | Test | Files | Request | Assertion |
+|----|------|-------|---------|-----------|
+| S30 | `test_root_serves_readme` | README.md | `GET /` | 200, HTML shell |
+| S31 | `test_explicit_file` | README.md, other.md | `GET /other.md` | 200 |
+| S32 | `test_missing_file_404` | README.md | `GET /nonexistent.md` | 404 |
+| S33 | `test_subdirectory_serves_readme` | sub/README.md | `GET /sub/` | 200 |
+| S34 | `test_binary_file_raw` | README.md, image.png | `GET /image.png` | 200, `image/png`, PNG bytes |
+| S35 | `test_path_traversal_blocked` | README.md | `GET /../../../etc/passwd` | 404 |
+| S36 | `test_normalized_redirect` | README.md | `GET /sub` (dir exists) | 302 to `/sub/` |
+
+### Dimension 10: Quiet mode
+
+| ID | Test | Config | Assertion |
+|----|------|--------|-----------|
+| S37 | `test_quiet_suppresses_log` | quiet=True | No stderr output from handler |
+
+---
+
+## Export Tests — `test_export.py`
+
+Tests for `export_page()` which produces self-contained HTML.
+
+### Dimension 1: Inline vs CDN
+
+| ID | Test | Config | Assertion |
+|----|------|--------|-----------|
+| E1 | `test_inline_contains_css` | inline=True | `<style>` with CSS content |
+| E2 | `test_inline_contains_js` | inline=True | `<script>` with JS content |
+| E3 | `test_inline_contains_markdraft_js` | inline=True | `marked.parse` in output |
+| E4 | `test_no_inline_has_cdn_links` | inline=False | `cdn.jsdelivr.net` in `<script src>` and `<link href>` |
+
+### Dimension 2: Markdown embedding
+
+| ID | Test | Input | Assertion |
+|----|------|-------|-----------|
+| E5 | `test_markdown_embedded` | `# Hello\n**bold**` | Raw markdown in `markdraft-source` script tag |
+| E6 | `test_script_tag_escaped` | `text</script>more` | `<\\/script` in output, no premature close |
+
+### Dimension 3: Page metadata
+
+| ID | Test | Config | Assertion |
+|----|------|--------|-----------|
+| E7 | `test_title_in_export` | title='My Page' | `<title>My Page</title>` |
+| E8 | `test_dark_theme` | theme='dark' | `data-color-mode="dark"`, dark highlight CSS |
+| E9 | `test_user_content_layout` | user_content=True | `pull-discussion-timeline`, no `id="readme"` |
+| E10 | `test_readme_layout_default` | default | `id="readme"`, no `pull-discussion-timeline` |
+
+### Dimension 4: Output destination
+
+| ID | Test | out_file | Assertion |
+|----|------|----------|-----------|
+| E11 | `test_export_to_file` | path to file | File written, contains `<!DOCTYPE html>` |
+| E12 | `test_export_to_stdout` | `'-'` | Captured stdout contains HTML |
+| E13 | `test_export_returns_string` | `None` | Returns HTML string |
+
+---
+
+## CLI Tests — `test_cli.py`
+
+### Subprocess tests
+
+| ID | Test | Command | Assertion |
+|----|------|---------|-----------|
+| C1 | `test_help` | `draft -h` | Output contains 'draft' |
+| C2 | `test_version` | `draft -V` | Output is version string |
+| C3 | `test_bad_flag` | `draft --nope` | Non-zero exit |
+
+### Direct main() tests
+
+| ID | Test | argv | Assertion |
+|----|------|------|-----------|
+| C4 | `test_version_flag` | `['-V']` | Returns 0, prints version |
+| C5 | `test_deprecated_a_flag` | `['-a']` | Returns 2 |
+| C6 | `test_deprecated_p_flag` | `['-p']` | Returns 2 |
+| C7 | `test_theme_invalid` | `['--theme=bad', '--export', '.']` | Returns 1 |
+| C8 | `test_theme_light_export` | `['--theme=light', '--export', path, out, '--quiet']` | Returns 0 |
+| C9 | `test_theme_dark_export` | `['--theme=dark', '--export', path, out, '--quiet']` | Returns 0 |
+| C10 | `test_clear_flag` | `['--clear']` | Returns 0, calls clear_cache |
+| C11 | `test_export_writes_file` | `['--export', path, out, '--quiet']` | File created with content |
+| C12 | `test_export_with_title` | `['--export', '--title=X', path, out, '--quiet']` | Title in HTML |
+| C13 | `test_missing_readme` | `['--export', empty_dir]` | Returns 1, prints 'Error' |
+| C14 | `test_quiet_export` | `['--export', '--quiet', path, out]` | No 'Exporting to' on stderr |
+| C15 | `test_no_inline_export` | `['--export', '--no-inline', path, out, '--quiet']` | CDN links in HTML |
+
+---
+
+## Component Tests — `test_components.py`
+
+Unit tests for modules with non-trivial logic.
+
+### Readers
+
+| ID | Test | Class | Assertion |
+|----|------|-------|-----------|
+| R1 | `test_directory_reader_finds_readme` | DirectoryReader | Finds README.md in directory |
+| R2 | `test_directory_reader_explicit_file` | DirectoryReader | Accepts explicit .md path |
+| R3 | `test_directory_reader_silent_missing` | DirectoryReader(silent=True) | Returns default path |
+| R4 | `test_directory_reader_raises_missing` | DirectoryReader | Raises ReadmeNotFoundError |
+| R5 | `test_directory_reader_normalize_none` | normalize_subpath(None) | Returns None |
+| R6 | `test_directory_reader_normalize_dir` | normalize_subpath('subdir') | Adds trailing `/` |
+| R7 | `test_directory_reader_normalize_file` | normalize_subpath('file.md') | No trailing `/` |
+| R8 | `test_directory_reader_traversal_blocked` | normalize_subpath('../escape') | Raises ReadmeNotFoundError |
+| R9 | `test_directory_reader_is_binary` | is_binary('img.png') | True |
+| R10 | `test_directory_reader_is_text` | is_binary('file.md') | False |
+| R11 | `test_directory_reader_last_updated` | last_updated for existing file | Returns float |
+| R12 | `test_directory_reader_last_updated_missing` | last_updated for missing | Returns None |
+| R13 | `test_directory_reader_read_text` | read('file.md') | Returns str |
+| R14 | `test_directory_reader_read_binary` | read('img.png') | Returns bytes |
+| R15 | `test_directory_reader_read_missing` | read('nope.md') | Raises ReadmeNotFoundError |
+| R16 | `test_text_reader_read` | TextReader('text').read() | Returns 'text' |
+| R17 | `test_text_reader_subpath_raises` | TextReader('text').read('x') | Raises ReadmeNotFoundError |
+| R18 | `test_text_reader_filename` | TextReader('t', 'f.md').filename_for(None) | Returns 'f.md' |
+| R19 | `test_stdin_reader_reads_once` | StdinReader mock | Calls read_stdin once |
+
+### Asset cache
+
+| ID | Test | Method | Assertion |
+|----|------|--------|-----------|
+| A1 | `test_get_path` | get_path('x.js') | Correct join |
+| A2 | `test_is_cached_true` | File exists | True |
+| A3 | `test_is_cached_false` | File missing | False |
+| A4 | `test_all_cached_true` | All CDN files exist | True |
+| A5 | `test_all_cached_false` | Some missing | False |
+| A6 | `test_ensure_downloads` | Empty cache | Calls urlretrieve N times |
+| A7 | `test_ensure_skips_existing` | Full cache | Zero downloads |
+| A8 | `test_ensure_handles_failure` | urlretrieve raises | No crash, prints warning |
+| A9 | `test_clear_removes_dir` | Populated cache | Dir gone |
+| A10 | `test_clear_missing_dir` | No dir | No error |
+
+### File watcher
+
+| ID | Test | Scenario | Assertion |
+|----|------|----------|-----------|
+| W1 | `test_yields_on_change` | Modify file mtime | Generator yields True |
+| W2 | `test_exits_on_shutdown` | Set shutdown_event | Generator returns |
+| W3 | `test_no_yield_without_change` | No change, then shutdown | No yields |
+
+### Browser helpers
+
+| ID | Test | Function | Assertion |
+|----|------|----------|-----------|
+| B1 | `test_is_server_running_true` | Listening socket | Returns True |
+| B2 | `test_is_server_running_false` | No listener | Returns False |
+| B3 | `test_wait_for_server_cancel` | cancel_event set | Returns False |
+| B4 | `test_start_browser_when_ready` | Mock webbrowser | Thread starts, calls open |
+
+### Config loading
+
+| ID | Test | Scenario | Assertion |
+|----|------|----------|-----------|
+| G1 | `test_load_missing_file` | No settings.py | Returns {} |
+| G2 | `test_load_settings` | Write settings.py with HOST='0.0.0.0' | Returns {'HOST': '0.0.0.0'} |
+| G3 | `test_load_ignores_lowercase` | Write foo='bar' | Not in result |
+| G4 | `test_env_var_override` | Set MARKDRAFT_HOME | Uses that path |
+| G5 | `test_resolve_config_defaults` | No args | HOST/PORT/AUTOREFRESH from config module |
+| G6 | `test_resolve_config_cli_overrides` | host='0.0.0.0' | Overrides default |
+| G7 | `test_resolve_config_settings_override` | Settings file with PORT=9000 | Uses 9000 |
+
+### Address parsing
+
+| ID | Test | Input | Expected |
+|----|------|-------|----------|
+| P1 | `test_split_none` | None | (None, None) |
+| P2 | `test_split_port_only` | '8080' | (None, 8080) |
+| P3 | `test_split_host_only` | 'localhost' | ('localhost', None) |
+| P4 | `test_split_host_port` | 'localhost:8080' | ('localhost', 8080) |
+| P5 | `test_split_empty` | '' | (None, None) |
+| P6 | `test_split_host_bad_port` | 'host:abc' | ('host:abc', None) |
+| P7 | `test_resolve_none_none` | (None, None) | (None, None) |
+| P8 | `test_resolve_path_only` | ('README.md', None) | ('README.md', None) |
+| P9 | `test_resolve_port_as_path` | ('8080', None) | (None, '8080') |
+| P10 | `test_resolve_both` | ('README.md', '8080') | ('README.md', '8080') |
+
+### Exceptions
+
+| ID | Test | Scenario | Assertion |
+|----|------|----------|-----------|
+| X1 | `test_str_default` | ReadmeNotFoundError() | 'README not found' |
+| X2 | `test_str_with_path` | ReadmeNotFoundError('.') | 'No README found at .' |
+| X3 | `test_str_with_message` | ReadmeNotFoundError('p', 'msg') | 'msg' |
+| X4 | `test_filename_attribute` | ReadmeNotFoundError('f.md') | .filename == 'f.md' |
+| X5 | `test_repr` | ReadmeNotFoundError('p', 'm') | Contains class name |
+
+---
+
+## API Integration Tests — in `test_cli.py`
+
+These exercise the `export()` and `clear_cache()` API functions
+end-to-end (they're thin wrappers, so CLI tests cover them).
+
+| ID | Test | Function | Assertion |
+|----|------|----------|-----------|
+| I1 | `test_export_default_filename` | export(path) with no out_filename | Creates `README.html` |
+| I2 | `test_export_stdout` | export(path, out_filename='-') | Prints to stdout |
+| I3 | `test_clear_cache` | clear_cache() | No error |
 
 ---
 
 ## Test infrastructure
 
-### Fixtures (conftest.py additions)
+### Fixtures (`conftest.py`)
 
-```python
-@pytest.fixture
-def grip_app(tmp_path, monkeypatch):
-    """Factory fixture: returns a function that creates a Grip test client."""
-    def _make(text, **kwargs):
-        monkeypatch.setenv('GRIPHOME', str(tmp_path))
-        filename = kwargs.pop('display_filename', 'README.md')
-        source = TextReader(text, filename)
-        assets = GitHubAssetManagerMock()
-        app = Grip(source, assets=assets, **kwargs)
-        return app.test_client()
-    return _make
-
-@pytest.fixture
-def grip_dir_app(tmp_path, monkeypatch):
-    """Factory fixture: creates a Grip app serving a temp directory."""
-    def _make(files, **kwargs):
-        monkeypatch.setenv('GRIPHOME', str(tmp_path / '.grip'))
-        content_dir = tmp_path / 'content'
-        content_dir.mkdir(exist_ok=True)
-        for name, content in files.items():
-            path = content_dir / name
-            path.parent.mkdir(parents=True, exist_ok=True)
-            if isinstance(content, bytes):
-                path.write_bytes(content)
-            else:
-                path.write_text(content)
-        source = DirectoryReader(str(content_dir))
-        assets = GitHubAssetManagerMock()
-        app = Grip(source, assets=assets, **kwargs)
-        return app.test_client()
-    return _make
+```
+preview_server(tmp_path) → factory(reader, **config) → TestClient
+text_server(tmp_path) → factory(text, **kwargs) → TestClient
+dir_server(tmp_path) → factory(files_dict, **kwargs) → TestClient
 ```
 
-### Mocking mmdc for component tests
+`TestClient` wraps `urllib.request` with `.get(path)` returning a
+`Response` with `.status_code`, `.data`, `.text()`, `.json()`,
+`.headers`.
 
-For regex/placeholder tests that need to isolate extraction from
-rendering, mock `subprocess.run` to return a canned SVG:
+`MockAssetCache` subclasses `AssetCache` — creates the cache dir but
+skips downloads.
 
-```python
-MOCK_SVG = '<svg xmlns="http://www.w3.org/2000/svg"><text>mock</text></svg>'
+### Test input files
 
-@pytest.fixture
-def mock_mmdc(monkeypatch):
-    """Patches subprocess.run so mmdc returns a fixed SVG."""
-    call_args = []
-    def fake_run(cmd, **kwargs):
-        call_args.append(cmd)
-        # Write mock SVG to the -o output path
-        out_path = cmd[cmd.index('-o') + 1]
-        with open(out_path, 'w') as f:
-            f.write(MOCK_SVG)
-        return subprocess.CompletedProcess(cmd, 0, '', '')
-    monkeypatch.setattr('subprocess.run', fake_run)
-    return call_args
+```
+tests/input/
+  default/README.md    — directory reader tests
+  gfm-test.md          — large markdown file
+  empty/               — empty directory (no README)
+  img.png              — binary file detection
 ```
 
-### Marking slow tests
-
-Tests that invoke real `mmdc` (M30-M34) are slower (~2-5s each).
-Mark them with `@pytest.mark.slow` and add to pytest.ini:
-
-```ini
-markers =
-    assumption: external assumption test
-    slow: tests that invoke mmdc (mermaid-cli)
-```
-
----
-
-## Files
-
-| File                    | Purpose                    |
-|-------------------------|----------------------------|
-| `tests/test_e2e.py`     | E2E tests (E1-E91)         |
-| `tests/test_mermaid.py` | Component tests (M1-M56)   |
-| `tests/conftest.py`     | Updated with new fixtures  |
-| `pytest.ini`            | Updated with `slow` marker |
-
-## Running
+### Running
 
 ```console
-# All new tests
-pytest tests/test_e2e.py tests/test_mermaid.py -v
-
-# Skip slow mmdc tests
-pytest tests/test_e2e.py tests/test_mermaid.py -v -m "not slow"
-
-# Only mermaid component tests
-pytest tests/test_mermaid.py -v
-
-# With coverage
-pytest tests/test_e2e.py tests/test_mermaid.py --cov=grip --cov-report=term-missing
+uv run pytest tests/ -v                      # all tests
+uv run pytest tests/test_server.py -v        # server only
+uv run pytest tests/test_components.py -v    # unit tests only
+uv run pyright markdraft/                    # type check
 ```
