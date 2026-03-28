@@ -7,7 +7,9 @@ import io
 import os
 import sys
 
+from .assets import AssetCache
 from .config import CDN_ASSETS
+from .readers import ReadmeReader
 
 
 EXPORT_TEMPLATE = """\
@@ -85,15 +87,20 @@ USER_CONTENT_BODY = """\
 GRIP_JS_DIR = os.path.join(os.path.dirname(__file__), 'static')
 
 
-def export_page(reader, subpath, assets, out_file=None, inline=True,
-                title=None, theme='light', user_content=False,
-                wide=False, quiet=False):
+def export_page(
+    reader: ReadmeReader, subpath: str | None,
+    assets: AssetCache, out_file: str | None = None,
+    inline: bool = True, title: str | None = None,
+    theme: str = 'light', user_content: bool = False,
+    wide: bool = False, quiet: bool = False,
+) -> str:
     """Export a rendered markdown page to HTML.
 
     If out_file is '-', writes to stdout.
     If out_file is None, returns the HTML string.
     """
-    text = reader.read(subpath)
+    raw = reader.read(subpath)
+    text = raw if isinstance(raw, str) else raw.decode('utf-8')
     filename = reader.filename_for(subpath) or ''
 
     page_title = title if title else (filename + ' - Grip' if filename else 'Grip')

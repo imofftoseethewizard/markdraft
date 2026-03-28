@@ -12,9 +12,12 @@ import os
 import posixpath
 import threading
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from typing import Any
 from urllib.parse import urlparse
 
+from .assets import AssetCache
 from .exceptions import ReadmeNotFoundError
+from .readers import ReadmeReader
 from .watcher import FileWatcher
 
 
@@ -80,22 +83,23 @@ class GripServer(ThreadingHTTPServer):
 
     daemon_threads = True
 
-    def __init__(self, address, reader, assets, config):
+    def __init__(self, address: tuple[str, int], reader: ReadmeReader,
+                 assets: AssetCache, config: dict[str, Any]) -> None:
         self.reader = reader
         self.assets = assets
         self.grip_config = config
         self.shutdown_event = threading.Event()
-        self._template = None
+        self._template: str | None = None
         super().__init__(address, GripHandler)
 
-    def get_template(self):
+    def get_template(self) -> str:
         if self._template is None:
             path = os.path.join(STATIC_DIR, 'template.html')
             with open(path, 'r', encoding='utf-8') as f:
                 self._template = f.read()
         return self._template
 
-    def build_page(self, subpath=None):
+    def build_page(self, subpath: str | None = None) -> str:
         """Build the HTML shell for a markdown page."""
         cfg = self.grip_config
         filename = self.reader.filename_for(subpath) or ''
@@ -148,9 +152,11 @@ class GripServer(ThreadingHTTPServer):
 class GripHandler(BaseHTTPRequestHandler):
     """Request handler with routing."""
 
-    def do_GET(self):
+    server: GripServer  # type: ignore[assignment]
+
+    def do_GET(self) -> None:
         path = urlparse(self.path).path
-        grip_url = self.server.grip_config.get('grip_url', '/__')
+        grip_url: str = self.server.grip_config.get('grip_url', '/__')
 
         if path.startswith(grip_url + '/api/content'):
             self._handle_api_content(path, grip_url)
@@ -161,7 +167,7 @@ class GripHandler(BaseHTTPRequestHandler):
         else:
             self._handle_page(path)
 
-    def _handle_page(self, path):
+    def _handle_page(self, path: str) -> None:
         subpath = path.lstrip('/') or None
 
         try:
@@ -177,10 +183,11 @@ class GripHandler(BaseHTTPRequestHandler):
         # Binary files
         if self.server.reader.is_binary(subpath):
             try:
-                data = self.server.reader.read(subpath)
+                raw = self.server.reader.read(subpath)
             except ReadmeNotFoundError:
                 self._send_error(404)
                 return
+            data = raw if isinstance(raw, bytes) else raw.encode('utf-8')
             mimetype = self.server.reader.mimetype_for(subpath) or 'application/octet-stream'
             self._send_bytes(200, data, mimetype)
             return
@@ -195,7 +202,7 @@ class GripHandler(BaseHTTPRequestHandler):
         page = self.server.build_page(subpath)
         self._send_text(200, page, 'text/html; charset=utf-8')
 
-    def _handle_api_content(self, path, grip_url):
+    def _handle_api_content(self, path: str, grip_url: str) -> None:
         subpath = self._extract_subpath(path, grip_url + '/api/content')
         try:
             text = self.server.reader.read(subpath)
@@ -206,7 +213,7 @@ class GripHandler(BaseHTTPRequestHandler):
         body = json.dumps({'text': text, 'filename': filename})
         self._send_text(200, body, 'application/json; charset=utf-8')
 
-    def _handle_api_refresh(self, path, grip_url):
+    def _handle_api_refresh(self, path: str, grip_url: str) -> None:
         if not self.server.grip_config.get('autorefresh', True):
             self._send_error(404)
             return
@@ -230,7 +237,7 @@ class GripHandler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
 
-    def _handle_static(self, path, grip_url):
+    def _handle_static(self, path: str, grip_url: str) -> None:
         prefix = grip_url + '/static/'
         filename = path[len(prefix):]
         if not filename or '..' in filename:
@@ -251,7 +258,7 @@ class GripHandler(BaseHTTPRequestHandler):
 
         self._send_error(404)
 
-    def _serve_file(self, filepath):
+    def _serve_file(self, filepath: str) -> None:
         mimetype, _ = mimetypes.guess_type(filepath)
         if mimetype is None:
             mimetype = 'application/octet-stream'
@@ -259,31 +266,31 @@ class GripHandler(BaseHTTPRequestHandler):
             data = f.read()
         self._send_bytes(200, data, mimetype)
 
-    def _extract_subpath(self, path, prefix):
+    def _extract_subpath(self, path: str, prefix: str) -> str | None:
         sub = path[len(prefix):].strip('/')
         return sub or None
 
-    def _send_text(self, code, text, content_type):
+    def _send_text(self, code: int, text: str, content_type: str) -> None:
         self._send_bytes(code, text.encode('utf-8'), content_type)
 
-    def _send_bytes(self, code, data, content_type):
+    def _send_bytes(self, code: int, data: bytes, content_type: str) -> None:
         self.send_response(code)
         self.send_header('Content-Type', content_type)
         self.send_header('Content-Length', str(len(data)))
         self.end_headers()
         self.wfile.write(data)
 
-    def _send_redirect(self, location):
+    def _send_redirect(self, location: str) -> None:
         self.send_response(302)
         self.send_header('Location', location)
         self.end_headers()
 
-    def _send_error(self, code):
+    def _send_error(self, code: int) -> None:
         self.send_response(code)
         self.send_header('Content-Type', 'text/plain')
         self.end_headers()
         self.wfile.write(str(code).encode())
 
-    def log_message(self, format, *args):
+    def log_message(self, format: str, *args: Any) -> None:
         if not self.server.grip_config.get('quiet'):
             super().log_message(format, *args)

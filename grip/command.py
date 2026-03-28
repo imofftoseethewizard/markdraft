@@ -17,7 +17,7 @@ version = 'Grip ' + __version__
 VALID_THEME_OPTIONS = ['light', 'dark']
 
 
-def _split_address(address):
+def _split_address(address: str | None) -> tuple[str | None, int | None]:
     """Parse an address string into (host, port)."""
     if not address:
         return None, None

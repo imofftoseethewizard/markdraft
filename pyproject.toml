@@ -15,6 +15,7 @@ gripper = "grip:main"
 dev = [
     "pytest>=8",
     "flake8>=7",
+    "pyright>=1.1.408",
 ]
 
 [build-system]
@@ -33,6 +34,10 @@ norecursedirs = ["venv", "site-packages", ".research", ".venv"]
 markers = [
     "assumption: mark a test as an external assumption.",
 ]
+
+[tool.pyright]
+pythonVersion = "3.10"
+typeCheckingMode = "standard"
 
 [tool.flake8]
 exclude = [".git", "__pycache__", ".research"]

@@ -4,6 +4,7 @@ Public API for Grip.
 
 import os
 import sys
+from typing import Any
 
 from . import __version__
 from .assets import AssetCache
@@ -13,13 +14,17 @@ from .config import (
     AUTOREFRESH, QUIET, load_user_settings)
 from .exceptions import ReadmeNotFoundError
 from .export import export_page
-from .readers import DirectoryReader, StdinReader, TextReader
+from .readers import DirectoryReader, ReadmeReader, StdinReader, TextReader
 from .server import GripServer
 
 
-def _resolve_config(host=None, port=None, autorefresh=None, quiet=None,
-                    theme='light', title=None, user_content=False,
-                    wide=False, grip_url='/__'):
+def _resolve_config(
+    host: str | None = None, port: int | None = None,
+    autorefresh: bool | None = None, quiet: bool | None = None,
+    theme: str = 'light', title: str | None = None,
+    user_content: bool = False, wide: bool = False,
+    grip_url: str = '/__',
+) -> dict[str, Any]:
     """Build a config dict from arguments + user settings."""
     settings = load_user_settings()
     return dict(
@@ -36,7 +41,8 @@ def _resolve_config(host=None, port=None, autorefresh=None, quiet=None,
     )
 
 
-def _make_reader(path=None, text=None):
+def _make_reader(path: str | None = None,
+                 text: str | None = None) -> ReadmeReader:
     """Create the appropriate reader for the given arguments."""
     if text is not None:
         display_filename = DirectoryReader(path, True).filename_for(None)
@@ -47,7 +53,7 @@ def _make_reader(path=None, text=None):
         return DirectoryReader(path)
 
 
-def _make_cache():
+def _make_cache() -> AssetCache:
     """Create an AssetCache with the default cache path."""
     griphome = os.path.expanduser(
         os.environ.get('GRIPHOME', DEFAULT_GRIPHOME))
@@ -56,16 +62,20 @@ def _make_cache():
     return AssetCache(cache_path)
 
 
-def serve(path=None, host=None, port=None, user_content=False,
-          wide=False, title=None, autorefresh=True,
-          browser=False, quiet=None, theme='light'):
+def serve(
+    path: str | None = None, host: str | None = None,
+    port: int | None = None, user_content: bool = False,
+    wide: bool = False, title: str | None = None,
+    autorefresh: bool = True, browser: bool = False,
+    quiet: bool | None = None, theme: str = 'light',
+) -> None:
     """Start the preview server."""
     reader = _make_reader(path)
     assets = _make_cache()
     config = _resolve_config(
         host, port, autorefresh, quiet, theme, title, user_content, wide)
 
-    assets.ensure_cached(quiet=config['quiet'])
+    assets.ensure_cached(quiet=bool(config['quiet']))
 
     address = (config['host'], config['port'])
     server = GripServer(address, reader, assets, config)
@@ -92,9 +102,12 @@ def serve(path=None, host=None, port=None, user_content=False,
             browser_thread.join(timeout=1)
 
 
-def export(path=None, user_content=False, wide=False,
-           render_inline=True, out_filename=None, title=None,
-           quiet=False, theme='light'):
+def export(
+    path: str | None = None, user_content: bool = False,
+    wide: bool = False, render_inline: bool = True,
+    out_filename: str | None = None, title: str | None = None,
+    quiet: bool = False, theme: str = 'light',
+) -> None:
     """Export rendered markdown to an HTML file."""
     reader = _make_reader(path)
     assets = _make_cache()
@@ -105,8 +118,9 @@ def export(path=None, user_content=False, wide=False,
         if path == '-':
             export_to_stdout = True
         else:
+            dir_reader = DirectoryReader(path)
             filetitle, _ = os.path.splitext(
-                os.path.relpath(reader.root_filename))
+                os.path.relpath(dir_reader.root_filename))
             out_filename = '{0}.html'.format(filetitle)
 
     if not export_to_stdout and not quiet:
@@ -118,7 +132,7 @@ def export(path=None, user_content=False, wide=False,
                 wide=wide, quiet=quiet)
 
 
-def clear_cache():
+def clear_cache() -> None:
     """Clear the cached assets."""
     assets = _make_cache()
     assets.clear()
