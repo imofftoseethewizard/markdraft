@@ -1,0 +1,21 @@
+{
+  "name": "Gripper",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    }
+  },
+  "postCreateCommand": "pip install -e '.[tests]' && npm install -g @mermaid-js/mermaid-cli @anthropic-ai/claude-code",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "bierner.markdown-mermaid"
+      ]
+    }
+  },
+  "forwardPorts": [6419]
+}

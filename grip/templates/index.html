@@ -33,6 +33,21 @@
 {%- endblock -%}
 
 {%- block scripts -%}
+  {%- for script_url in script_urls %}
+  <script src="{{ script_url }}"></script>
+  {%- endfor %}
+  {%- if scripts %}
+  <script>
+    {%- for script in scripts %}
+    {{ script|safe }}
+    {%- endfor %}
+  </script>
+  {%- endif %}
+  <script>
+    if (typeof mermaid !== 'undefined') {
+      mermaid.initialize({ startOnLoad: true });
+    }
+  </script>
   <script>
     function showCanonicalImages() {
       var images = document.getElementsByTagName('img');

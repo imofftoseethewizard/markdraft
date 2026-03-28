@@ -4,7 +4,9 @@ import json
 
 import requests
 import responses
-from grip import DEFAULT_API_URL, GitHubAssetManager, Grip, StdinReader
+from grip import (
+    DEFAULT_API_URL, GitHubAssetManager, GitHubRenderer, Grip, StdinReader)
+from grip.constants import MERMAID_JS_URL
 
 from helpers import USER_CONTEXT, input_file, output_file
 
@@ -118,8 +120,13 @@ class GitHubAssetManagerMock(GitHubAssetManager):
 
     def retrieve_styles(self, asset_url_path):
         self.retrieve_styles_calls += 1
+        if not self.script_urls:
+            self.script_urls = [MERMAID_JS_URL]
 
 
 class GripMock(Grip):
+    def default_renderer(self):
+        return GitHubRenderer()
+
     def default_asset_manager(self):
         return GitHubAssetManagerMock()

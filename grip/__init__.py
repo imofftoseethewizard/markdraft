@@ -28,6 +28,7 @@ from .constants import (
     SUPPORTED_EXTENSIONS, SUPPORTED_TITLES)
 from .exceptions import AlreadyRunningError, ReadmeNotFoundError
 from .readers import ReadmeReader, DirectoryReader, StdinReader, TextReader
+from .mermaid import GripperRenderer
 from .renderers import ReadmeRenderer, GitHubRenderer, OfflineRenderer
 
 
@@ -40,7 +41,8 @@ __all__ = [
     'STYLE_URLS_SOURCE', 'SUPPORTED_EXTENSIONS', 'SUPPORTED_TITLES',
 
     'AlreadyRunningError', 'DirectoryReader', 'GitHubAssetManager',
-    'GitHubRenderer', 'Grip', 'OfflineRenderer', 'ReadmeNotFoundError',
+    'GitHubRenderer', 'Grip', 'GripperRenderer', 'OfflineRenderer',
+    'ReadmeNotFoundError',
     'ReadmeAssetManager', 'ReadmeReader', 'ReadmeRenderer', 'StdinReader',
     'TextReader',
 

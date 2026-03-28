@@ -33,6 +33,7 @@ from .constants import (
     DEFAULT_GRIPHOME, DEFAULT_GRIPURL, STYLE_ASSET_URLS_INLINE_FORMAT)
 from .exceptions import AlreadyRunningError, ReadmeNotFoundError
 from .readers import DirectoryReader
+from .mermaid import GripperRenderer
 from .renderers import GitHubRenderer, ReadmeRenderer
 
 
@@ -227,7 +228,10 @@ class Grip(Flask):
             title=self.title, content=content, favicon=favicon,
             user_content=self.renderer.user_content,
             wide_style=self.render_wide, style_urls=self.assets.style_urls,
-            styles=self.assets.styles, autorefresh_url=autorefresh_url,
+            styles=self.assets.styles,
+            script_urls=self.assets.script_urls,
+            scripts=self.assets.scripts,
+            autorefresh_url=autorefresh_url,
             data_color_mode=data_color_mode, data_light_theme=data_light_theme,
             data_dark_theme=data_dark_theme)
 
@@ -343,6 +347,16 @@ class Grip(Flask):
         self.assets.styles.extend(styles)
         self.assets.style_urls[:] = []
 
+    def _inline_scripts(self):
+        """
+        Downloads scripts from the script URL list, clears it, and adds
+        each script's content to the literal scripts list.
+        """
+        for script_url in self.assets.script_urls:
+            content = self._download(script_url)
+            self.assets.scripts.append(content)
+        self.assets.script_urls[:] = []
+
     def _retrieve_styles(self):
         """
         Retrieves the style URLs from the source and caches them. This
@@ -362,6 +376,7 @@ class Grip(Flask):
                       file=sys.stderr)
         if self.render_inline:
             self._inline_styles()
+            self._inline_scripts()
 
     def default_renderer(self):
         """
@@ -369,7 +384,7 @@ class Grip(Flask):
 
         This is only used if renderer is set to None in the constructor.
         """
-        return GitHubRenderer(api_url=self.config['API_URL'])
+        return GripperRenderer()
 
     def default_asset_manager(self):
         """

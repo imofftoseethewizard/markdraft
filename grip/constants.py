@@ -36,3 +36,8 @@ STYLE_ASSET_URLS_RE = (
 STYLE_ASSET_URLS_SUB_FORMAT = r'url("{0}\1")'
 STYLE_ASSET_URLS_INLINE_FORMAT = (
     r'''url\(['"]?((?:/static|{0})/[^'" \)]+)['"]?\)''')
+
+
+# Mermaid.js for client-side diagram rendering
+MERMAID_JS_URL = (
+    'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js')

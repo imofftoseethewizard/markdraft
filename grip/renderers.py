@@ -8,9 +8,11 @@ import requests
 
 try:
     import markdown
+    from markdown.extensions.codehilite import CodeHiliteExtension
     from .vendor.mdx_urlize import UrlizeExtension
 except ImportError:
     markdown = None
+    CodeHiliteExtension = None
     UrlizeExtension = None
 
 from .constants import DEFAULT_API_URL
@@ -97,15 +99,21 @@ class OfflineRenderer(ReadmeRenderer):
         """
         Renders the specified markdown content and embedded styles.
         """
-        if markdown is None:
-            import markdown
-        if UrlizeExtension is None:
-            from .mdx_urlize import UrlizeExtension
-        return markdown.markdown(text, extensions=[
+        _markdown = markdown
+        if _markdown is None:
+            import markdown as _markdown
+        _CodeHiliteExtension = CodeHiliteExtension
+        if _CodeHiliteExtension is None:
+            from markdown.extensions.codehilite import (
+                CodeHiliteExtension as _CodeHiliteExtension)
+        _UrlizeExtension = UrlizeExtension
+        if _UrlizeExtension is None:
+            from .vendor.mdx_urlize import UrlizeExtension as _UrlizeExtension
+        return _markdown.markdown(text, extensions=[
             'fenced_code',
-            'codehilite(css_class=highlight)',
+            _CodeHiliteExtension(css_class='highlight'),
             'toc',
             'tables',
             'sane_lists',
-            UrlizeExtension(),
+            _UrlizeExtension(),
         ])

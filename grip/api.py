@@ -7,6 +7,7 @@ import errno
 
 from .app import Grip
 from .readers import DirectoryReader, StdinReader, TextReader
+from .mermaid import GripperRenderer
 from .renderers import GitHubRenderer, OfflineRenderer
 
 
@@ -32,7 +33,7 @@ def create_app(path=None, user_content=False, context=None, username=None,
 
     # Customize the renderer
     if render_offline:
-        renderer = OfflineRenderer(user_content, context)
+        renderer = GripperRenderer(user_content, context)
     elif user_content or context or api_url:
         renderer = GitHubRenderer(user_content, context, api_url)
     else:
@@ -89,7 +90,7 @@ def render_content(text, user_content=False, context=None, username=None,
     """
     renderer = (GitHubRenderer(user_content, context, api_url)
                 if not render_offline else
-                OfflineRenderer(user_content, context))
+                GripperRenderer(user_content, context))
     auth = (username, password) if username or password else None
     return renderer.render(text, auth)
 

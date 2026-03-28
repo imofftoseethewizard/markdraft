@@ -17,8 +17,8 @@ import requests
 from ._compat import safe_join
 
 from .constants import (
-    STYLE_URLS_SOURCE, STYLE_URLS_RES, STYLE_ASSET_URLS_RE,
-    STYLE_ASSET_URLS_SUB_FORMAT)
+    MERMAID_JS_URL, STYLE_URLS_SOURCE, STYLE_URLS_RES,
+    STYLE_ASSET_URLS_RE, STYLE_ASSET_URLS_SUB_FORMAT)
 from .vendor.six import add_metaclass
 
 
@@ -34,6 +34,8 @@ class ReadmeAssetManager(object):
         self.cache_path = cache_path
         self.style_urls = list(style_urls) if style_urls else []
         self.styles = []
+        self.script_urls = []
+        self.scripts = []
         self.quiet = quiet
 
     def _strip_url_params(self, url):
@@ -111,16 +113,20 @@ class GitHubAssetManager(ReadmeAssetManager):
         Gets the URLs of the cached styles.
         """
         try:
-            cached_styles = os.listdir(self.cache_path)
+            cached_files = os.listdir(self.cache_path)
         except IOError as ex:
             if ex.errno != errno.ENOENT and ex.errno != errno.ESRCH:
                 raise
             return []
         except OSError:
             return []
-        return [posixpath.join(asset_url_path, style)
-                for style in cached_styles
-                if style.endswith('.css')]
+        # Populate script_urls from cached .js files
+        self.script_urls = [posixpath.join(asset_url_path, f)
+                            for f in cached_files
+                            if f.endswith('.js')]
+        return [posixpath.join(asset_url_path, f)
+                for f in cached_files
+                if f.endswith('.css')]
 
     def _cache_contents(self, style_urls, asset_url_path):
         """
@@ -151,6 +157,17 @@ class GitHubAssetManager(ReadmeAssetManager):
             if files is not None:
                 filename = self.cache_filename(style_url)
                 files[filename] = contents.encode('utf-8')
+
+        # Download mermaid.js for client-side diagram rendering
+        if not self.quiet:
+            print(' * Downloading script', MERMAID_JS_URL, file=sys.stderr)
+        r = requests.get(MERMAID_JS_URL)
+        if 200 <= r.status_code < 300:
+            if files is not None:
+                files['mermaid.min.js'] = r.content
+        else:
+            print(' -> Warning: Script request responded with',
+                  r.status_code, file=sys.stderr)
 
         for asset_url in asset_urls:
             if not self.quiet:
@@ -193,3 +210,6 @@ class GitHubAssetManager(ReadmeAssetManager):
         if not asset_url_path.endswith('/'):
             asset_url_path += '/'
         self.style_urls.extend(self._get_style_urls(asset_url_path))
+        # If no script_urls were populated from cache, use CDN directly
+        if not self.script_urls:
+            self.script_urls = [MERMAID_JS_URL]

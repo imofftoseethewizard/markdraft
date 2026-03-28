@@ -46,5 +46,5 @@ setup(
     install_requires=read('requirements.txt').splitlines(),
     extras_require={'tests': read('requirements-test.txt').splitlines()},
     zip_safe=False,
-    entry_points={'console_scripts': ['grip = grip:main']},
+    entry_points={'console_scripts': ['grip = grip:main', 'gripper = grip:main']},
 )
