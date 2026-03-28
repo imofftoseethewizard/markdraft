@@ -16,9 +16,7 @@ class ReadmeNotFoundError(FileNotFoundError):
         super().__init__(errno.ENOENT, "README not found", path)
 
     def __repr__(self) -> str:
-        return "{0}({1!r}, {2!r})".format(
-            type(self).__name__, self.path, self.message
-        )
+        return "{0}({1!r}, {2!r})".format(type(self).__name__, self.path, self.message)
 
     def __str__(self) -> str:
         if self.message:

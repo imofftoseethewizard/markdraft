@@ -77,6 +77,14 @@ class TestMarkdownEmbedding:
         source_section = html.split("markdraft-source")[1].split("</script")[0]
         assert "</script>more" not in source_section
 
+    def test_script_tag_case_insensitive(self, tmp_path):
+        reader = TextReader("text</ScRiPt><script>alert(1)</script>end", "README.md")
+        assets = MockAssetCache(str(tmp_path / "cache"))
+        html = export_page(reader, None, assets)
+        # Case-insensitive </script> variants must all be escaped
+        source_section = html.split("markdraft-source")[1].split("</script")[0]
+        assert "</ScRiPt>" not in source_section
+
 
 class TestExportMetadata:
     def test_title(self, tmp_path):

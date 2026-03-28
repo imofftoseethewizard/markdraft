@@ -67,7 +67,9 @@ def _make_reader(path: str | None = None, text: str | None = None) -> ReadmeRead
 
 def _make_cache() -> AssetCache:
     """Create an AssetCache with the default cache path."""
-    config_home = os.path.expanduser(os.environ.get("MARKDRAFT_HOME", DEFAULT_CONFIG_HOME))
+    config_home = os.path.expanduser(
+        os.environ.get("MARKDRAFT_HOME", DEFAULT_CONFIG_HOME)
+    )
     cache_dir = CACHE_DIRECTORY.format(version=__version__)
     cache_path = os.path.join(config_home, cache_dir)
     return AssetCache(cache_path)

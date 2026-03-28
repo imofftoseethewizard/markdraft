@@ -11,12 +11,32 @@ from .config import DEFAULT_FILENAMES, DEFAULT_FILENAME
 from .exceptions import ReadmeNotFoundError
 
 
-def _safe_join(directory: str, *pathnames: str) -> str:
-    """Join paths safely, raising ReadmeNotFoundError on traversal."""
+def _safe_join(directory: str, *pathnames: str, follow_symlinks: bool = False) -> str:
+    """Join paths safely, raising ReadmeNotFoundError on traversal.
+
+    Uses Path.relative_to() which is immune to prefix collisions
+    (e.g. /home/user vs /home/user.hidden) unlike string startswith.
+
+    If follow_symlinks is False (default), rejects paths that contain
+    symlinks pointing outside the base directory.
+    """
     base = Path(directory).resolve()
     target = (base / os.path.join(*pathnames)).resolve()
-    if target != base and not str(target).startswith(str(base) + os.sep):
+    try:
+        target.relative_to(base)
+    except ValueError:
         raise ReadmeNotFoundError(str(target))
+    if not follow_symlinks:
+        # Walk each component to check for symlinks escaping root
+        check = base
+        for part in Path(os.path.join(*pathnames)).parts:
+            check = check / part
+            if check.is_symlink():
+                real = check.resolve()
+                try:
+                    real.relative_to(base)
+                except ValueError:
+                    raise ReadmeNotFoundError(str(check))
     return str(target)
 
 

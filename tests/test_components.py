@@ -76,6 +76,29 @@ class TestDirectoryReader:
         with pytest.raises(ReadmeNotFoundError):
             reader.normalize_subpath("../escape")
 
+    def test_symlink_outside_root_blocked(self, tmp_path):
+        # Create served directory and a sibling outside it
+        served = tmp_path / "served"
+        served.mkdir()
+        (served / "README.md").write_text("hi")
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (outside / "secret.md").write_text("secret")
+        # Symlink from inside served/ to outside
+        (served / "link.md").symlink_to(outside / "secret.md")
+        reader = DirectoryReader(str(served))
+        with pytest.raises(ReadmeNotFoundError):
+            reader.read("link.md")
+
+    def test_symlink_inside_root_allowed(self, tmp_path):
+        served = tmp_path / "served"
+        served.mkdir()
+        (served / "README.md").write_text("hi")
+        (served / "real.md").write_text("real content")
+        (served / "link.md").symlink_to(served / "real.md")
+        reader = DirectoryReader(str(served))
+        assert reader.read("link.md") == "real content"
+
     def test_is_binary_png(self):
         reader = DirectoryReader(DIRNAME, silent=True)
         assert reader.is_binary("input/img.png")

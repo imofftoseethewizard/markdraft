@@ -5,6 +5,7 @@ Export markdown to a self-contained HTML file.
 import html
 import io
 import os
+import re
 import sys
 
 from .assets import AssetCache
@@ -107,7 +108,9 @@ def export_page(
     text = raw if isinstance(raw, str) else raw.decode("utf-8")
     filename = reader.filename_for(subpath) or ""
 
-    page_title = title if title else (filename + " - Markdraft" if filename else "Markdraft")
+    page_title = (
+        title if title else (filename + " - Markdraft" if filename else "Markdraft")
+    )
     display_title = html.escape(title or filename)
     data_color_mode = "dark" if theme == "dark" else "light"
 
@@ -135,8 +138,9 @@ def export_page(
             )
         page_body = README_BODY.format(box_header=box_header)
 
-    # Escape markdown for embedding in <script> tag
-    escaped_markdown = text.replace("</script", "<\\/script")
+    # Escape markdown for embedding in <script> tag.
+    # Must be case-insensitive — HTML treats </Script> same as </script>.
+    escaped_markdown = re.sub(r"</script", r"<\\/script", text, flags=re.IGNORECASE)
 
     highlight_css_name = (
         "github-highlight-dark.min.css"

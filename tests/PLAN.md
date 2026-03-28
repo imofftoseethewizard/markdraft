@@ -172,6 +172,7 @@ Tests for `export_page()` which produces self-contained HTML.
 |----|------|-------|-----------|
 | E5 | `test_markdown_embedded` | `# Hello\n**bold**` | Raw markdown in `markdraft-source` script tag |
 | E6 | `test_script_tag_escaped` | `text</script>more` | `<\\/script` in output, no premature close |
+| E6a | `test_script_tag_case_insensitive` | `text</ScRiPt>...` | Case-insensitive variants also escaped |
 
 ### Dimension 3: Page metadata
 
@@ -237,6 +238,8 @@ Unit tests for modules with non-trivial logic.
 | R6 | `test_directory_reader_normalize_dir` | normalize_subpath('subdir') | Adds trailing `/` |
 | R7 | `test_directory_reader_normalize_file` | normalize_subpath('file.md') | No trailing `/` |
 | R8 | `test_directory_reader_traversal_blocked` | normalize_subpath('../escape') | Raises ReadmeNotFoundError |
+| R8a | `test_symlink_outside_root_blocked` | Symlink to file outside root | Raises ReadmeNotFoundError |
+| R8b | `test_symlink_inside_root_allowed` | Symlink to file inside root | Reads content normally |
 | R9 | `test_directory_reader_is_binary` | is_binary('img.png') | True |
 | R10 | `test_directory_reader_is_text` | is_binary('file.md') | False |
 | R11 | `test_directory_reader_last_updated` | last_updated for existing file | Returns float |
