@@ -1,6 +1,8 @@
+/* Page layout — match GitHub's README width */
 .preview-page {
-  margin-top: 64px;
-  margin-bottom: 21px;
+  max-width: 1012px;
+  margin: 64px auto 21px;
+  padding: 0 16px;
 }
 .timeline-comment-wrapper > .timeline-comment:after,
 .timeline-comment-wrapper > .timeline-comment:before {
