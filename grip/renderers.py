@@ -1,5 +1,3 @@
-from __future__ import print_function, unicode_literals
-
 import json
 import sys
 from abc import ABCMeta, abstractmethod
@@ -17,11 +15,9 @@ except ImportError:
 
 from .constants import DEFAULT_API_URL
 from .patcher import patch
-from .vendor.six import add_metaclass
 
 
-@add_metaclass(ABCMeta)
-class ReadmeRenderer(object):
+class ReadmeRenderer(object, metaclass=ABCMeta):
     """
     Renders the Readme.
     """
@@ -59,9 +55,7 @@ class GitHubRenderer(ReadmeRenderer):
         Raises TypeError if text is not a Unicode string.
         Raises requests.HTTPError if the request fails.
         """
-        # Ensure text is Unicode
-        expected = str if sys.version_info[0] >= 3 else unicode  # noqa
-        if not isinstance(text, expected):
+        if not isinstance(text, str):
             raise TypeError(
                 'Expected a Unicode string, got {!r}.'.format(text))
 

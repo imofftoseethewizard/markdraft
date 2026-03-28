@@ -42,42 +42,104 @@ Options:
                     Valid options ("light", "dark"). Default: "light"
 """
 
-from __future__ import print_function
-
+import argparse
 import sys
 import mimetypes
 import socket
 import errno
 
-from docopt import docopt
 from getpass import getpass
-from path_and_address import resolve, split_address
 
 from . import __version__
 from .api import clear_cache, export, serve
 from .exceptions import ReadmeNotFoundError
 
 
-usage = '\n\n\n'.join(__doc__.split('\n\n\n')[1:])
 version = 'Grip ' + __version__
 
 # Note: GitHub supports more than light mode and dark mode (exp: light-high-constrast, dark-high-constrast).
 VALID_THEME_OPTIONS = ['light', 'dark']
 
-def main(argv=None, force_utf8=True, patch_svg=True):
+
+def _split_address(address):
+    """Parse an address string into (host, port).
+
+    Accepts 'host:port', ':port', 'host', or a bare port number.
+    Returns (host_or_None, port_as_int_or_None).
+    """
+    if not address:
+        return None, None
+
+    if ':' in address:
+        host, _, port_str = address.rpartition(':')
+        host = host or None
+        try:
+            port = int(port_str)
+        except ValueError:
+            return address, None
+        return host, port
+
+    # Bare token: if it's a number, treat as port; otherwise as host
+    try:
+        return None, int(address)
+    except ValueError:
+        return address, None
+
+
+def _resolve_path_address(path_arg, address_arg):
+    """Resolve positional arguments into (path, address).
+
+    When only one positional is given, determine whether it's a path or
+    an address based on whether it parses as a port number or host:port.
+    """
+    if path_arg is None or address_arg is not None:
+        return path_arg, address_arg
+
+    # Single positional: is it an address?
+    _, port = _split_address(path_arg)
+    if port is not None:
+        return None, path_arg
+
+    return path_arg, None
+
+
+def _build_parser():
+    parser = argparse.ArgumentParser(
+        prog='grip',
+        description='Render local readme files before sending off to GitHub.',
+        add_help=True)
+    parser.add_argument('path', nargs='?', default=None,
+                        help='File or directory to render (- for stdin)')
+    parser.add_argument('address', nargs='?', default=None,
+                        help='Host:port to listen on, or output file for --export')
+    parser.add_argument('-V', action='store_true', default=False,
+                        help='Show version and exit')
+    parser.add_argument('--version', action='version', version=version)
+    parser.add_argument('--user-content', action='store_true', default=False)
+    parser.add_argument('--context', default=None)
+    parser.add_argument('--user', default=None)
+    parser.add_argument('--pass', dest='password', default=None)
+    parser.add_argument('--wide', action='store_true', default=False)
+    parser.add_argument('--clear', action='store_true', default=False)
+    parser.add_argument('--export', action='store_true', default=False)
+    parser.add_argument('--no-inline', action='store_true', default=False)
+    parser.add_argument('-b', '--browser', action='store_true', default=False)
+    parser.add_argument('--api-url', default=None)
+    parser.add_argument('--title', default=None)
+    parser.add_argument('--norefresh', action='store_true', default=False)
+    parser.add_argument('--quiet', action='store_true', default=False)
+    parser.add_argument('--theme', default=None)
+    return parser
+
+
+def main(argv=None):
     """
     The entry point of the application.
     """
-    if force_utf8 and sys.version_info[0] == 2:
-        reload(sys)  # noqa
-        sys.setdefaultencoding('utf-8')
-    if patch_svg and sys.version_info[0] == 2 and sys.version_info[1] <= 6:
-        mimetypes.add_type('image/svg+xml', '.svg')
-
     if argv is None:
         argv = sys.argv[1:]
 
-    # Show specific errors
+    # Show specific errors for legacy flags
     if '-a' in argv or '--address' in argv:
         print('Use grip [options] <path> <address> instead of -a')
         print('See grip -h for details')
@@ -87,28 +149,28 @@ def main(argv=None, force_utf8=True, patch_svg=True):
         print('See grip -h for details')
         return 2
 
-    # Parse options
-    args = docopt(usage, argv=argv, version=version)
+    parser = _build_parser()
+    args = parser.parse_args(argv)
 
-    # Handle printing version with -V (docopt handles --version)
-    if args['-V']:
+    # Handle printing version with -V
+    if args.V:
         print(version)
         return 0
 
     # Clear the cache
-    if args['--clear']:
+    if args.clear:
         clear_cache()
         return 0
 
     # Get password from prompt if necessary
-    password = args['--pass']
-    if args['--user'] and not password:
+    password = args.password
+    if args.user and not password:
         password = getpass()
 
     # Parse theme argument
-    if args['--theme']:
-        if args['--theme'] in VALID_THEME_OPTIONS:
-            theme: str = args['--theme']
+    if args.theme:
+        if args.theme in VALID_THEME_OPTIONS:
+            theme = args.theme
         else:
             print('Error: valid options for theme argument are "light", "dark"')
             return 1
@@ -116,20 +178,20 @@ def main(argv=None, force_utf8=True, patch_svg=True):
         theme = 'light'
 
     # Export to a file instead of running a server
-    if args['--export']:
+    if args.export:
         try:
-            export(args['<path>'], args['--user-content'], args['--context'],
-                   args['--user'], password, False, args['--wide'],
-                   not args['--no-inline'], args['<address>'],
-                   args['--api-url'], args['--title'], args['--quiet'], theme)
+            export(args.path, args.user_content, args.context,
+                   args.user, password, False, args.wide,
+                   not args.no_inline, args.address,
+                   args.api_url, args.title, args.quiet, theme)
             return 0
         except ReadmeNotFoundError as ex:
             print('Error:', ex)
             return 1
 
-    # Parse arguments
-    path, address = resolve(args['<path>'], args['<address>'])
-    host, port = split_address(address)
+    # Parse positional arguments
+    path, address = _resolve_path_address(args.path, args.address)
+    host, port = _split_address(address)
 
     # Validate address
     if address and not host and port is None:
@@ -137,10 +199,10 @@ def main(argv=None, force_utf8=True, patch_svg=True):
 
     # Run server
     try:
-        serve(path, host, port, args['--user-content'], args['--context'],
-              args['--user'], password, False, args['--wide'], False,
-              args['--api-url'], args['--title'], not args['--norefresh'],
-              args['--browser'], args['--quiet'], theme, None)
+        serve(path, host, port, args.user_content, args.context,
+              args.user, password, False, args.wide, False,
+              args.api_url, args.title, not args.norefresh,
+              args.browser, args.quiet, theme, None)
         return 0
     except ReadmeNotFoundError as ex:
         print('Error:', ex)

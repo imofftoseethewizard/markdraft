@@ -1,5 +1,3 @@
-from __future__ import print_function, unicode_literals
-
 import errno
 import os
 import posixpath
@@ -7,10 +5,7 @@ import re
 import sys
 import shutil
 from abc import ABCMeta, abstractmethod
-try:
-    from urlparse import urljoin
-except ImportError:
-    from urllib.parse import urljoin
+from urllib.parse import urljoin
 
 import requests
 
@@ -19,11 +14,9 @@ from ._compat import safe_join
 from .constants import (
     MERMAID_JS_URL, STYLE_URLS_SOURCE, STYLE_URLS_RES,
     STYLE_ASSET_URLS_RE, STYLE_ASSET_URLS_SUB_FORMAT)
-from .vendor.six import add_metaclass
 
 
-@add_metaclass(ABCMeta)
-class ReadmeAssetManager(object):
+class ReadmeAssetManager(object, metaclass=ABCMeta):
     """
     Manages the style and font assets rendered with Readme pages.
 

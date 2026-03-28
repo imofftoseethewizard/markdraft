@@ -4,8 +4,6 @@ End-to-end tests for the Gripper rendering pipeline.
 Each test makes HTTP requests against a Flask test client and asserts
 on the returned HTML. Uses GripperRenderer (the default) unless noted.
 """
-from __future__ import print_function, unicode_literals
-
 import pytest
 
 from grip import (

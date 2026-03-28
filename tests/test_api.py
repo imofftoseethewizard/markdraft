@@ -6,8 +6,6 @@ this doesn't run a server (see test_cli.py for that). Instead, this creates
 fake objects with subclasses and tests the basic expected behavior of Grip.
 """
 
-from __future__ import print_function, unicode_literals
-
 import logging
 import os
 import posixpath

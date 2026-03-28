@@ -4,8 +4,6 @@ Component tests for GripperRenderer and OfflineRenderer.
 Tests mermaid block extraction, placeholder substitution, and base
 offline rendering.
 """
-from __future__ import print_function, unicode_literals
-
 import pytest
 
 from grip import GripperRenderer, OfflineRenderer

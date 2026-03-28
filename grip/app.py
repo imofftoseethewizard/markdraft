@@ -1,5 +1,3 @@
-from __future__ import print_function, unicode_literals
-
 import base64
 import json
 import mimetypes
@@ -12,14 +10,7 @@ import threading
 import time
 import errno
 from traceback import format_exc
-try:
-    from urlparse import urlparse
-except ImportError:
-    from urllib.parse import urlparse
-try:
-    str_type = basestring
-except NameError:
-    str_type = str
+from urllib.parse import urlparse
 
 import requests
 from flask import (
@@ -47,7 +38,7 @@ class Grip(Flask):
                  autorefresh=None, quiet=None, theme='light', grip_url=None,
                  static_url_path=None, instance_path=None, **kwargs):
         # Defaults
-        if source is None or isinstance(source, str_type):
+        if source is None or isinstance(source, str):
             source = DirectoryReader(source)
         if render_wide is None:
             render_wide = False

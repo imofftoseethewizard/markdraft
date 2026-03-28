@@ -1,5 +1,3 @@
-from __future__ import print_function, unicode_literals
-
 import errno
 import io
 import mimetypes
@@ -12,11 +10,9 @@ from ._compat import safe_join
 
 from .constants import DEFAULT_FILENAMES, DEFAULT_FILENAME
 from .exceptions import ReadmeNotFoundError
-from .vendor.six import add_metaclass
 
 
-@add_metaclass(ABCMeta)
-class ReadmeReader(object):
+class ReadmeReader(object, metaclass=ABCMeta):
     """
     Reads Readme content from a URL subpath.
     """
@@ -327,9 +323,5 @@ class StdinReader(TextReader):
         Reads STDIN until the end of input and returns a unicode string.
         """
         text = sys.stdin.read()
-
-        # Decode the bytes returned from earlier Python STDIN implementations
-        if sys.version_info[0] < 3 and text is not None:
-            text = text.decode(sys.stdin.encoding or 'utf-8')
 
         return text
