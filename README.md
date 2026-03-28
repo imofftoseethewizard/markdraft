@@ -34,8 +34,8 @@ and run it directly — no installation needed:
 python markdraft.pyz README.md
 ```
 
-Requires Python 3.10+. On first run, markdraft downloads ~3.5 MB of
-JavaScript libraries from [jsDelivr](https://www.jsdelivr.com/) and
+Requires Python 3.10+. On first run, markdraft downloads about 3.5 MB
+of JavaScript libraries from [jsDelivr](https://www.jsdelivr.com/) and
 caches them in `~/.markdraft/`.
 
 
@@ -176,18 +176,20 @@ Markdraft is a thin HTTP server built on Python's `http.server`. It
 serves raw markdown via a JSON API and lets the browser handle all
 rendering:
 
-```
-Browser                          Server (http.server)
-  │  GET /                         │
-  │───────────────────────────────>│ HTML shell (template + script tags)
-  │  GET /__/api/content           │
-  │───────────────────────────────>│ raw markdown as JSON
-  │  [marked.js renders markdown]  │
-  │  [KaTeX renders math]          │
-  │  [highlight.js highlights code]│
-  │  [mermaid.js renders diagrams] │
-  │  GET /__/api/refresh (SSE)     │
-  │───────────────────────────────>│ file change notifications
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant S as Server (http.server)
+    B->>S: GET /
+    S-->>B: HTML shell (template + script tags)
+    B->>S: GET /__/api/content
+    S-->>B: raw markdown as JSON
+    Note over B: marked.js renders markdown
+    Note over B: KaTeX renders math
+    Note over B: highlight.js highlights code
+    Note over B: mermaid.js renders diagrams
+    B->>S: GET /__/api/refresh (SSE)
+    S-->>B: file change notifications
 ```
 
 Modules:

@@ -169,6 +169,7 @@ def export_page(
             "marked-alert.umd.js",
             "highlight.min.js",
             "katex.min.js",
+            "marked-katex-extension.umd.js",
             "mermaid.min.js",
         ]
 
@@ -200,18 +201,16 @@ def export_page(
             '  <link rel="stylesheet" href="{2}" />'
         ).format(cdn["github-markdown.css"], cdn[highlight_css_name], KATEX_CSS_URL)
 
-        script_assets = (
-            '  <script src="{0}"></script>\n'
-            '  <script src="{1}"></script>\n'
-            '  <script src="{2}"></script>\n'
-            '  <script src="{3}"></script>\n'
-            '  <script src="{4}"></script>'
-        ).format(
-            cdn["marked.min.js"],
-            cdn["marked-alert.umd.js"],
-            cdn["highlight.min.js"],
-            cdn["katex.min.js"],
-            cdn["mermaid.min.js"],
+        script_assets = "\n".join(
+            '  <script src="{0}"></script>'.format(cdn[name])
+            for name in [
+                "marked.min.js",
+                "marked-alert.umd.js",
+                "highlight.min.js",
+                "katex.min.js",
+                "marked-katex-extension.umd.js",
+                "mermaid.min.js",
+            ]
         )
 
     client_js = _read_client_js()

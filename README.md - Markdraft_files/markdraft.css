@@ -10,18 +10,6 @@
   width: 920px;
 }
 
-/* Box header respects color mode */
-[data-color-mode="dark"] .color-bg-default {
-  background-color: #161b22;
-  color: #e6edf3;
-}
-[data-color-mode="dark"] .Box {
-  border-color: #30363d;
-}
-[data-color-mode="dark"] .Box-header {
-  border-bottom-color: #30363d;
-}
-
 /* GitHub-style alerts ([!NOTE], [!TIP], etc.) */
 .markdown-alert {
   padding: 0.5rem 1rem;

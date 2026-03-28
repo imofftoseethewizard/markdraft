@@ -6,6 +6,25 @@
   var refreshUrl = app.getAttribute('data-refresh-url');
   var theme = app.getAttribute('data-theme') || 'light';
 
+  // --- Math (KaTeX) rendering ---
+
+  function renderMath(text) {
+    if (typeof katex === 'undefined') return text;
+    // Block math: $$...$$ (must be on own lines)
+    text = text.replace(/\$\$\n?([\s\S]*?)\n?\$\$/g, function (_, math) {
+      try {
+        return katex.renderToString(math.trim(), { displayMode: true, throwOnError: false });
+      } catch (e) { return '$$' + math + '$$'; }
+    });
+    // Inline math: $...$  (not preceded/followed by $, not spanning lines)
+    text = text.replace(/(?<!\$)\$(?!\$)([^\n$]+?)\$(?!\$)/g, function (_, math) {
+      try {
+        return katex.renderToString(math.trim(), { displayMode: false, throwOnError: false });
+      } catch (e) { return '$' + math + '$'; }
+    });
+    return text;
+  }
+
   // --- Configure marked ---
 
   marked.setOptions({
@@ -24,20 +43,10 @@
     }
   });
 
-  // Register marked-katex-extension for $inline$ and $$display$$ math.
-  // This integrates with marked's tokenizer so it correctly skips code spans.
-  if (typeof markedKatex !== 'undefined') {
-    marked.use(markedKatex.default
-      ? markedKatex.default({ throwOnError: false })
-      : markedKatex({ throwOnError: false }));
-  }
-
-  // Register marked-alert for GitHub-style alerts
+  // Register marked-alert extension for GitHub-style alerts
   // ([!NOTE], [!TIP], [!IMPORTANT], [!WARNING], [!CAUTION])
   if (typeof markedAlert !== 'undefined') {
-    marked.use(markedAlert.markedAlert
-      ? markedAlert.markedAlert()
-      : markedAlert());
+    marked.use(markedAlert.markedAlert ? markedAlert.markedAlert() : markedAlert());
   }
 
   // Custom renderer: mermaid code blocks become <pre class="mermaid">
@@ -63,6 +72,8 @@
   }
 
   function renderMarkdown(text) {
+    // Render math before markdown (so $ delimiters aren't consumed by marked)
+    text = renderMath(text);
     var html = marked.parse(text, { renderer: renderer });
     document.getElementById('markdraft-content').innerHTML = html;
     initMermaid();

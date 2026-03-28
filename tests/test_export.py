@@ -23,6 +23,7 @@ class MockAssetCache(AssetCache):
             "marked-alert.umd.js",
             "highlight.min.js",
             "katex.min.js",
+            "marked-katex-extension.umd.js",
             "mermaid.min.js",
         ]:
             with open(os.path.join(path, name), "w") as f:

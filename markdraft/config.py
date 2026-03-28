@@ -44,6 +44,7 @@ CDN_ASSETS = {
     "github-markdown.css": "https://cdn.jsdelivr.net/npm/github-markdown-css@5/github-markdown.css",
     # Math (LaTeX) rendering
     "katex.min.js": "https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js",
+    "marked-katex-extension.umd.js": "https://cdn.jsdelivr.net/npm/marked-katex-extension",
     # GitHub-style alerts ([!NOTE], [!WARNING], etc.)
     "marked-alert.umd.js": "https://cdn.jsdelivr.net/npm/marked-alert",
 }
