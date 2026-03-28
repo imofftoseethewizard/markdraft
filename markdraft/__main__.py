@@ -16,4 +16,4 @@ if __name__ == "__main__":
 
     from markdraft.command import main
 
-    main()
+    sys.exit(main())
