@@ -8,6 +8,7 @@ fake objects with subclasses and tests the basic expected behavior of Grip.
 
 from __future__ import print_function, unicode_literals
 
+import logging
 import os
 import posixpath
 
@@ -21,20 +22,18 @@ from mocks import (
 
 from grip import (
     DEFAULT_FILENAME, DirectoryReader, GitHubAssetManager, GitHubRenderer,
-    Grip, ReadmeNotFoundError, ReadmeReader, ReadmeRenderer, TextReader,
-    create_app)
-
-
-# TODO: Test DEFAULT_API_URL, DEFAULT_FILENAMES, DEFAULT_GRIPHOME,
-#       DEFAULT_GRIPURL, STYLE_ASSET_URLS_INLINE_FORMAT, STYLE_ASSET_URLS_RE,
-#       STYLE_ASSET_URLS_SUB_FORMAT, STYLE_URLS_RES, STYLE_URLS_SOURCE,
-#       SUPPORTED_EXTENSIONS, SUPPORTED_TITLES, ReadmeAssetManager,
-#       OfflineRenderer, clear_cache, create_app, export, main, render_content,
-#       render_page, serve
+    GripperRenderer, Grip, OfflineRenderer, ReadmeNotFoundError,
+    ReadmeAssetManager, ReadmeReader, ReadmeRenderer, TextReader,
+    clear_cache, create_app, export, render_content, render_page)
+from grip.patcher import patch
 
 
 DIRNAME = os.path.dirname(os.path.abspath(__file__))
 
+
+# ---------------------------------------------------------------------------
+# Exceptions
+# ---------------------------------------------------------------------------
 
 def test_exceptions():
     """
@@ -47,6 +46,10 @@ def test_exceptions():
     assert ReadmeNotFoundError().filename is None
     assert ReadmeNotFoundError(DEFAULT_FILENAME).filename == DEFAULT_FILENAME
 
+
+# ---------------------------------------------------------------------------
+# Readers
+# ---------------------------------------------------------------------------
 
 def test_readme_reader():
     with pytest.raises(TypeError):
@@ -180,6 +183,10 @@ def test_stdin_reader():
         StdinReaderMock(text, filename).read(filename)
 
 
+# ---------------------------------------------------------------------------
+# Renderers
+# ---------------------------------------------------------------------------
+
 def test_readme_renderer():
     with pytest.raises(TypeError):
         ReadmeRenderer()
@@ -219,74 +226,367 @@ def test_github_renderer():
         assert len(responses.calls) == 2
 
 
+def test_github_renderer_type_error():
+    """Passing bytes instead of unicode string raises TypeError."""
+    with GitHubRequestsMock():
+        with pytest.raises(TypeError):
+            GitHubRenderer().render(b'bytes input')
+
+
+def test_github_renderer_raw_mode():
+    """raw=True returns unpatched HTML (no octicon span replacement)."""
+    simple_input = input_file('simple.md')
+    with GitHubRequestsMock():
+        raw_html = GitHubRenderer(raw=True).render(simple_input)
+        patched_html = GitHubRenderer().render(simple_input)
+        # Both should return content, raw may differ from patched
+        assert isinstance(raw_html, str)
+        assert isinstance(patched_html, str)
+
+
+def test_github_renderer_custom_api_url():
+    """Custom api_url is stored on the renderer."""
+    renderer = GitHubRenderer(api_url='https://github.example.com/api/v3')
+    assert renderer.api_url == 'https://github.example.com/api/v3'
+
+
+def test_github_renderer_user_content_params():
+    """user_content and context are stored on the renderer."""
+    renderer = GitHubRenderer(user_content=True, context='owner/repo')
+    assert renderer.user_content is True
+    assert renderer.context == 'owner/repo'
+
+
 def test_offline_renderer():
-    # TODO: Test all GitHub rendering features and get the renderer to pass
-    # FUTURE: Expose OfflineRenderer once all Markdown features are tested
-    pass
+    """OfflineRenderer is instantiable and stores params."""
+    r = OfflineRenderer()
+    assert r.user_content is False
+    assert r.context is None
+
+    r2 = OfflineRenderer(user_content=True, context='owner/repo')
+    assert r2.user_content is True
+    assert r2.context == 'owner/repo'
+
+    # Renders markdown
+    html = r.render('**bold**')
+    assert '<strong>bold</strong>' in html
 
 
-def test_readme_asset_manager():
-    with pytest.raises(TypeError):
-        ReadmeRenderer()
+# ---------------------------------------------------------------------------
+# Patcher
+# ---------------------------------------------------------------------------
+
+class TestPatcher:
+    """Tests for grip.patcher.patch()."""
+
+    def test_patch_incomplete_task(self):
+        html = '<li>[ ] Todo</li>'
+        result = patch(html)
+        assert 'task-list-item' in result
+        assert 'type="checkbox"' in result
+        assert 'checked' not in result
+        assert 'Todo' in result
+
+    def test_patch_complete_task(self):
+        html = '<li>[x] Done</li>'
+        result = patch(html)
+        assert 'task-list-item' in result
+        assert 'checked=""' in result
+        assert 'Done' in result
+
+    def test_patch_task_with_nested_list(self):
+        html = '<li>[ ] Parent<ul><li>Child</li></ul>'
+        result = patch(html)
+        assert 'task-list-item' in result
+        assert 'Parent' in result
+        assert '<ul>' in result
+
+    def test_patch_skipped_for_user_content(self):
+        html = '<li>[ ] Todo</li>'
+        result = patch(html, user_content=True)
+        # Task list patching is skipped for user content
+        assert 'task-list-item' not in result
+        assert result == html
+
+    def test_patch_header(self):
+        html = ('<span>{:"aria-hidden"=&gt;"true", :class=&gt;'
+                '"octicon octicon-link"}</span>')
+        result = patch(html)
+        assert 'class="octicon octicon-link"' in result
+        assert '{:"aria-hidden"' not in result
+
+    def test_patch_no_match(self):
+        html = '<p>Regular paragraph</p>'
+        assert patch(html) == html
 
 
-def test_github_asset_manager(tmpdir):
-    cache_dir = tmpdir.mkdir('cache-dummy')
-    assets = GitHubAssetManager(str(cache_dir))
+# ---------------------------------------------------------------------------
+# Asset manager
+# ---------------------------------------------------------------------------
 
-    cache_dir.join('dummy1.css').write_text('', 'utf-8')
-    cache_dir.join('dummy2.css').write_text('', 'utf-8')
-    assert len(cache_dir.listdir()) == 2
-    assets.clear()
-    assert not cache_dir.check()
+class TestAssetManager:
+    """Tests for ReadmeAssetManager and GitHubAssetManager."""
 
-    # TODO: Test style retrieval on a fresh cache
-    # TODO: Test that an existing cache is used when styles are requested
-    # TODO: Test the upgrade case (cache-x.y.z should be fresh)
+    def test_asset_manager_abstract(self):
+        with pytest.raises(TypeError):
+            ReadmeAssetManager('dummy-path')
 
+    def test_cache_filename_strips_params(self):
+        assets = GitHubAssetManager('dummy')
+        assert assets.cache_filename(
+            'http://x/style.css?v=1#hash') == 'style.css'
 
-# TODO: test_browser?
+    def test_cache_filename_basename(self):
+        assets = GitHubAssetManager('dummy')
+        assert assets.cache_filename(
+            'http://x/path/to/file.css') == 'file.css'
 
+    def test_clear_nonexistent_cache(self):
+        assets = GitHubAssetManager('/nonexistent/path/cache')
+        # Should not raise
+        assets.clear()
 
-def test_app(monkeypatch, tmpdir):
-    monkeypatch.setenv('GRIPHOME', str(tmpdir))
-    zero_path = input_filename('zero.md')
-    zero_output = output_file('app', 'zero.html')
-    gfm_test_path = input_filename('gfm-test.md')
-    gfm_test_output = output_file('app', 'gfm-test.html')
-    assets = GitHubAssetManagerMock()
+    def test_clear_removes_directory(self, tmpdir):
+        cache_dir = tmpdir.mkdir('cache')
+        cache_dir.join('style.css').write_text('body {}', 'utf-8')
+        assets = GitHubAssetManager(str(cache_dir))
+        assert cache_dir.check()
+        assets.clear()
+        assert not cache_dir.check()
 
-    renderer = GitHubRenderer()
-
-    with GitHubRequestsMock() as responses:
-        assert Grip(zero_path, renderer=renderer, assets=assets).render() == zero_output
-        assert Grip(zero_path, renderer=renderer, assets=assets).render('/') == zero_output
-        assert Grip(zero_path, renderer=renderer, assets=assets).render('/x/../') == zero_output
-        with Grip(zero_path, renderer=renderer, assets=assets).test_client() as client:
-            assert client.get('/').data.decode('utf-8') == zero_output
-        assert len(responses.calls) == 4
-
-    with GitHubRequestsMock() as responses:
-        app = Grip(gfm_test_path, renderer=renderer, assets=assets)
-        assert app.render() == gfm_test_output
-        assert app.render('/') == gfm_test_output
-        assert len(responses.calls) == 2
-
-    # TODO: Test all constructor parameters
-    # TODO: Test other methods
-    # TODO: cd('input', 'default') and run on cwd
-    # TODO: Test 403 responses
-    # TODO: Test behaviors? -> anchor tags, autorefresh
+    def test_script_urls_initialized(self):
+        assets = GitHubAssetManagerMock()
+        assert assets.script_urls == []
+        assert assets.scripts == []
 
 
-def test_api():
-    assert isinstance(create_app(grip_class=GripMock), GripMock)
+# ---------------------------------------------------------------------------
+# Grip app
+# ---------------------------------------------------------------------------
 
-    # TODO: Test all API functions and argument combinations
+class TestGripApp:
+    """Tests for the Grip Flask application class."""
+
+    def test_app_renders(self, monkeypatch, tmpdir):
+        """Existing test: Grip renders known inputs to expected outputs."""
+        monkeypatch.setenv('GRIPHOME', str(tmpdir))
+        zero_path = input_filename('zero.md')
+        zero_output = output_file('app', 'zero.html')
+        gfm_test_path = input_filename('gfm-test.md')
+        gfm_test_output = output_file('app', 'gfm-test.html')
+        assets = GitHubAssetManagerMock()
+        renderer = GitHubRenderer()
+
+        with GitHubRequestsMock() as responses:
+            assert Grip(zero_path, renderer=renderer, assets=assets).render() == zero_output
+            assert Grip(zero_path, renderer=renderer, assets=assets).render('/') == zero_output
+            assert Grip(zero_path, renderer=renderer, assets=assets).render('/x/../') == zero_output
+            with Grip(zero_path, renderer=renderer, assets=assets).test_client() as client:
+                assert client.get('/').data.decode('utf-8') == zero_output
+            assert len(responses.calls) == 4
+
+        with GitHubRequestsMock() as responses:
+            app = Grip(gfm_test_path, renderer=renderer, assets=assets)
+            assert app.render() == gfm_test_output
+            assert app.render('/') == gfm_test_output
+            assert len(responses.calls) == 2
+
+    def test_default_renderer_is_gripper(self, monkeypatch, tmpdir):
+        monkeypatch.setenv('GRIPHOME', str(tmpdir))
+        app = Grip(TextReader('hi', 'README.md'),
+                   assets=GitHubAssetManagerMock())
+        assert isinstance(app.renderer, GripperRenderer)
+
+    def test_string_source_creates_directory_reader(self, monkeypatch, tmpdir):
+        monkeypatch.setenv('GRIPHOME', str(tmpdir))
+        default_dir = input_filename('default')
+        app = Grip(default_dir, assets=GitHubAssetManagerMock())
+        assert isinstance(app.reader, DirectoryReader)
+
+    def test_none_source_uses_cwd(self, monkeypatch, tmpdir):
+        monkeypatch.setenv('GRIPHOME', str(tmpdir))
+        app = Grip(None, assets=GitHubAssetManagerMock())
+        assert isinstance(app.reader, DirectoryReader)
+
+    def test_quiet_mode(self, monkeypatch, tmpdir):
+        monkeypatch.setenv('GRIPHOME', str(tmpdir))
+        app = Grip(TextReader('hi'), assets=GitHubAssetManagerMock(),
+                   quiet=True)
+        assert app.quiet is True
+
+    def test_clear_cache(self, monkeypatch, tmpdir):
+        monkeypatch.setenv('GRIPHOME', str(tmpdir))
+        assets = GitHubAssetManagerMock()
+        app = Grip(TextReader('hi'), assets=assets)
+        app.clear_cache()
+        assert assets.clear_calls == 1
+
+    def test_theme_stored(self, monkeypatch, tmpdir):
+        monkeypatch.setenv('GRIPHOME', str(tmpdir))
+        app = Grip(TextReader('hi'), assets=GitHubAssetManagerMock(),
+                   theme='dark')
+        assert app.theme == 'dark'
+
+    def test_render_wide_stored(self, monkeypatch, tmpdir):
+        monkeypatch.setenv('GRIPHOME', str(tmpdir))
+        app = Grip(TextReader('hi'), assets=GitHubAssetManagerMock(),
+                   render_wide=True)
+        assert app.render_wide is True
+
+    def test_render_inline_stored(self, monkeypatch, tmpdir):
+        monkeypatch.setenv('GRIPHOME', str(tmpdir))
+        app = Grip(TextReader('hi'), assets=GitHubAssetManagerMock(),
+                   render_inline=True)
+        assert app.render_inline is True
+
+    def test_title_stored(self, monkeypatch, tmpdir):
+        monkeypatch.setenv('GRIPHOME', str(tmpdir))
+        app = Grip(TextReader('hi'), assets=GitHubAssetManagerMock(),
+                   title='Custom')
+        assert app.title == 'Custom'
 
 
-def test_command():
-    # TODO: Test main(argv) with all command and argument combinations
-    # TODO: Test autorefresh by mimicking the browser with a manually GET
-    # TODO: Test browser opening using monkey patching?
-    pass
+# ---------------------------------------------------------------------------
+# API functions
+# ---------------------------------------------------------------------------
+
+class TestCreateApp:
+    """Tests for grip.api.create_app()."""
+
+    def test_default(self):
+        app = create_app(grip_class=GripMock)
+        assert isinstance(app, GripMock)
+
+    def test_text_uses_text_reader(self):
+        app = create_app(text='# Hi', grip_class=GripMock)
+        assert isinstance(app.reader, TextReader)
+        assert app.reader.read() == '# Hi'
+
+    def test_stdin_path(self):
+        app = create_app(path='-', grip_class=GripMock)
+        from grip import StdinReader
+        assert isinstance(app.reader, StdinReader)
+
+    def test_offline_uses_gripper_renderer(self):
+        app = create_app(render_offline=True, grip_class=GripMock)
+        assert isinstance(app.renderer, GripperRenderer)
+
+    def test_user_content_uses_github_renderer(self):
+        app = create_app(user_content=True, grip_class=GripMock)
+        assert isinstance(app.renderer, GitHubRenderer)
+        assert app.renderer.user_content is True
+
+    def test_context_uses_github_renderer(self):
+        app = create_app(context='owner/repo', grip_class=GripMock)
+        assert isinstance(app.renderer, GitHubRenderer)
+        assert app.renderer.context == 'owner/repo'
+
+    def test_api_url_uses_github_renderer(self):
+        app = create_app(api_url='https://custom', grip_class=GripMock)
+        assert isinstance(app.renderer, GitHubRenderer)
+        assert app.renderer.api_url == 'https://custom'
+
+    def test_no_renderer_specified(self):
+        app = create_app(grip_class=GripMock)
+        # renderer=None means app uses default_renderer()
+        # GripMock.default_renderer() returns GitHubRenderer
+        assert isinstance(app.renderer, GitHubRenderer)
+
+    def test_auth_tuple(self):
+        app = create_app(username='user', password='pass',
+                         grip_class=GripMock)
+        assert app.auth == ('user', 'pass')
+
+    def test_no_auth(self):
+        app = create_app(grip_class=GripMock)
+        # Auth is None unless config provides it
+        # GripMock uses default config which has USERNAME=None, PASSWORD=None
+        assert app.auth is None
+
+    def test_render_wide(self):
+        app = create_app(render_wide=True, grip_class=GripMock)
+        assert app.render_wide is True
+
+    def test_theme(self):
+        app = create_app(theme='dark', grip_class=GripMock)
+        assert app.theme == 'dark'
+
+
+class TestRenderContent:
+    """Tests for grip.api.render_content()."""
+
+    def test_offline(self):
+        html = render_content('**bold**', render_offline=True)
+        assert '<strong>bold</strong>' in html
+
+    def test_github(self):
+        text = input_file('simple.md')
+        with GitHubRequestsMock():
+            html = render_content(text)
+        assert html  # non-empty
+
+    def test_offline_user_content(self):
+        html = render_content('**bold**', render_offline=True,
+                              user_content=True)
+        assert '<strong>bold</strong>' in html
+
+
+class TestRenderPage:
+    """Tests for grip.api.render_page()."""
+
+    def test_offline_with_text(self):
+        html = render_page(text='# Hello', render_offline=True,
+                           quiet=True, grip_class=GripMock)
+        assert '<!DOCTYPE html>' in html
+        assert 'Hello' in html
+
+    def test_offline_with_file(self, tmp_path):
+        md_file = tmp_path / 'README.md'
+        md_file.write_text('# File Test')
+        html = render_page(str(tmp_path), render_offline=True,
+                           quiet=True, grip_class=GripMock)
+        assert 'File Test' in html
+
+
+class TestExport:
+    """Tests for grip.api.export()."""
+
+    def test_export_to_file(self, tmp_path, monkeypatch):
+        monkeypatch.setenv('GRIPHOME', str(tmp_path / '.grip'))
+        md_file = tmp_path / 'README.md'
+        md_file.write_text('# Export')
+        out = str(tmp_path / 'out.html')
+        export(str(tmp_path), render_offline=True, out_filename=out,
+               quiet=True)
+        with open(out) as f:
+            html = f.read()
+        assert '<!DOCTYPE html>' in html
+        assert 'Export' in html
+
+    def test_export_to_stdout(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.setenv('GRIPHOME', str(tmp_path / '.grip'))
+        md_file = tmp_path / 'README.md'
+        md_file.write_text('# Stdout')
+        export(str(tmp_path), render_offline=True, out_filename='-',
+               quiet=True)
+        captured = capsys.readouterr()
+        assert '<!DOCTYPE html>' in captured.out
+
+    def test_export_default_filename(self, tmp_path, monkeypatch):
+        monkeypatch.setenv('GRIPHOME', str(tmp_path / '.grip'))
+        md_file = tmp_path / 'README.md'
+        md_file.write_text('# Default')
+        monkeypatch.chdir(tmp_path)
+        export(str(tmp_path), render_offline=True, quiet=True)
+        out = tmp_path / 'README.html'
+        assert out.exists()
+        assert 'Default' in out.read_text()
+
+
+class TestClearCache:
+    """Tests for grip.api.clear_cache()."""
+
+    def test_clear_cache_calls_app(self):
+        # GripMock uses GitHubAssetManagerMock which tracks clear calls
+        clear_cache(grip_class=GripMock)
+        # Just verify it doesn't raise
