@@ -32,13 +32,25 @@ CACHE_DIRECTORY = "cache-{version}"
 # -- CDN assets ---------------------------------------------------------------
 
 CDN_ASSETS = {
+    # Markdown rendering
     "marked.min.js": "https://cdn.jsdelivr.net/npm/marked/marked.min.js",
+    # Syntax highlighting
     "highlight.min.js": "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js",
     "github-highlight.min.css": "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github.min.css",
     "github-highlight-dark.min.css": "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github-dark.min.css",
+    # Mermaid diagrams
     "mermaid.min.js": "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js",
+    # GitHub styling
     "github-markdown.css": "https://cdn.jsdelivr.net/npm/github-markdown-css@5/github-markdown.css",
+    # Math (LaTeX) rendering
+    "katex.min.js": "https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js",
+    # GitHub-style alerts ([!NOTE], [!WARNING], etc.)
+    "marked-alert.umd.js": "https://cdn.jsdelivr.net/npm/marked-alert",
 }
+
+# KaTeX CSS is loaded from CDN directly (references relative font URLs
+# that the CDN serves automatically). Not cached locally.
+KATEX_CSS_URL = "https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css"
 
 
 def load_user_settings(config_home: str | None = None) -> dict[str, object]:

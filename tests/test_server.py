@@ -25,7 +25,9 @@ class TestPageRoutes:
         client = text_server("text")
         html = client.get("/").text()
         assert "marked.min.js" in html
+        assert "marked-alert.umd.js" in html
         assert "highlight.min.js" in html
+        assert "katex.min.js" in html
         assert "mermaid.min.js" in html
         assert "markdraft.js" in html
 
@@ -33,6 +35,7 @@ class TestPageRoutes:
         client = text_server("text")
         html = client.get("/").text()
         assert "github-markdown.css" in html
+        assert "katex.min.css" in html
         assert "markdraft.css" in html
         assert "octicons.css" in html
 

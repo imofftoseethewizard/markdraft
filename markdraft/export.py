@@ -9,7 +9,7 @@ import re
 import sys
 
 from .assets import AssetCache
-from .config import CDN_ASSETS
+from .config import CDN_ASSETS, KATEX_CSS_URL
 from .readers import ReadmeReader
 
 EXPORT_TEMPLATE = """\
@@ -164,7 +164,13 @@ def export_page(
     if inline:
         # Read all assets and inline them
         css_files = ["github-markdown.css", highlight_css_name]
-        js_files = ["marked.min.js", "highlight.min.js", "mermaid.min.js"]
+        js_files = [
+            "marked.min.js",
+            "marked-alert.umd.js",
+            "highlight.min.js",
+            "katex.min.js",
+            "mermaid.min.js",
+        ]
 
         head_parts = []
         for css_name in css_files:
@@ -172,6 +178,10 @@ def export_page(
             if os.path.isfile(css_path):
                 with open(css_path, "r", encoding="utf-8") as f:
                     head_parts.append("  <style>\n" + f.read() + "\n  </style>")
+        # KaTeX CSS always from CDN (references relative font URLs)
+        head_parts.append(
+            '  <link rel="stylesheet" href="{0}" />'.format(KATEX_CSS_URL)
+        )
         head_assets = "\n".join(head_parts)
 
         script_parts = []
@@ -186,14 +196,23 @@ def export_page(
         cdn = CDN_ASSETS
         head_assets = (
             '  <link rel="stylesheet" href="{0}" />\n'
-            '  <link rel="stylesheet" href="{1}" />'
-        ).format(cdn["github-markdown.css"], cdn[highlight_css_name])
+            '  <link rel="stylesheet" href="{1}" />\n'
+            '  <link rel="stylesheet" href="{2}" />'
+        ).format(cdn["github-markdown.css"], cdn[highlight_css_name], KATEX_CSS_URL)
 
         script_assets = (
             '  <script src="{0}"></script>\n'
             '  <script src="{1}"></script>\n'
-            '  <script src="{2}"></script>'
-        ).format(cdn["marked.min.js"], cdn["highlight.min.js"], cdn["mermaid.min.js"])
+            '  <script src="{2}"></script>\n'
+            '  <script src="{3}"></script>\n'
+            '  <script src="{4}"></script>'
+        ).format(
+            cdn["marked.min.js"],
+            cdn["marked-alert.umd.js"],
+            cdn["highlight.min.js"],
+            cdn["katex.min.js"],
+            cdn["mermaid.min.js"],
+        )
 
     client_js = _read_client_js()
 

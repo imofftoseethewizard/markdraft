@@ -20,7 +20,9 @@ class MockAssetCache(AssetCache):
             "github-highlight.min.css",
             "github-highlight-dark.min.css",
             "marked.min.js",
+            "marked-alert.umd.js",
             "highlight.min.js",
+            "katex.min.js",
             "mermaid.min.js",
         ]:
             with open(os.path.join(path, name), "w") as f:
@@ -40,6 +42,8 @@ class TestInlineExport:
         html = export_page(reader, None, assets)
         assert "/* dummy marked.min.js */" in html
         assert "/* dummy highlight.min.js */" in html
+        assert "/* dummy katex.min.js */" in html
+        assert "/* dummy marked-alert.umd.js */" in html
         assert "/* dummy mermaid.min.js */" in html
 
     def test_contains_markdraft_js(self, tmp_path):
@@ -48,6 +52,13 @@ class TestInlineExport:
         html = export_page(reader, None, assets)
         assert "markdraft-source" in html
         assert "marked.parse" in html
+
+    def test_inline_includes_katex_css_link(self, tmp_path):
+        """KaTeX CSS is always from CDN even in inline mode (font URLs)."""
+        reader = TextReader("text", "README.md")
+        assets = MockAssetCache(str(tmp_path / "cache"))
+        html = export_page(reader, None, assets)
+        assert "katex.min.css" in html
 
 
 class TestCdnExport:

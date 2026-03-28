@@ -16,6 +16,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from .assets import AssetCache
+from .config import KATEX_CSS_URL
 from .exceptions import ReadmeNotFoundError
 from .readers import ReadmeReader
 from .watcher import FileWatcher
@@ -184,6 +185,7 @@ class PreviewServer(ThreadingHTTPServer):
             favicon_url=static_url + "/favicon.ico",
             static_url=static_url,
             highlight_css_url=static_url + "/" + highlight_css,
+            katex_css_url=KATEX_CSS_URL,
             content_url=content_path,
             refresh_url=refresh_url,
             data_color_mode=data_color_mode,
