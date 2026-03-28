@@ -40,8 +40,9 @@ CDN_ASSETS = {
     "github-highlight-dark.min.css": "https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github-dark.min.css",
     # Mermaid diagrams
     "mermaid.min.js": "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js",
-    # GitHub styling
-    "github-markdown.css": "https://cdn.jsdelivr.net/npm/github-markdown-css@5/github-markdown.css",
+    # GitHub styling (light and dark builds — no prefers-color-scheme)
+    "github-markdown-light.css": "https://cdn.jsdelivr.net/npm/github-markdown-css@5/github-markdown-light.css",
+    "github-markdown-dark.css": "https://cdn.jsdelivr.net/npm/github-markdown-css@5/github-markdown-dark.css",
     # Math (LaTeX) rendering
     "katex.min.js": "https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js",
     "marked-katex-extension.umd.js": "https://cdn.jsdelivr.net/npm/marked-katex-extension",

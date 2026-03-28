@@ -34,7 +34,7 @@ class TestPageRoutes:
     def test_page_includes_css_links(self, text_server):
         client = text_server("text")
         html = client.get("/").text()
-        assert "github-markdown.css" in html
+        assert "github-markdown-light.css" in html
         assert "katex.min.css" in html
         assert "markdraft.css" in html
         assert "octicons.css" in html

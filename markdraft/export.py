@@ -161,9 +161,13 @@ def export_page(
         else "github-highlight.min.css"
     )
 
+    markdown_css_name = (
+        "github-markdown-dark.css" if theme == "dark" else "github-markdown-light.css"
+    )
+
     if inline:
         # Read all assets and inline them
-        css_files = ["github-markdown.css", highlight_css_name, "leaflet.css"]
+        css_files = [markdown_css_name, highlight_css_name, "leaflet.css"]
         js_files = [
             "marked.min.js",
             "marked-alert.umd.js",
@@ -200,7 +204,7 @@ def export_page(
         head_assets = "\n".join(
             '  <link rel="stylesheet" href="{0}" />'.format(url)
             for url in [
-                cdn["github-markdown.css"],
+                cdn[markdown_css_name],
                 cdn[highlight_css_name],
                 KATEX_CSS_URL,
                 cdn["leaflet.css"],

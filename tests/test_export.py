@@ -16,7 +16,8 @@ class MockAssetCache(AssetCache):
         super().__init__(path)
         os.makedirs(path, exist_ok=True)
         for name in [
-            "github-markdown.css",
+            "github-markdown-light.css",
+            "github-markdown-dark.css",
             "github-highlight.min.css",
             "github-highlight-dark.min.css",
             "marked.min.js",
@@ -38,7 +39,7 @@ class TestInlineExport:
         reader = TextReader("text", "README.md")
         assets = MockAssetCache(str(tmp_path / "cache"))
         html = export_page(reader, None, assets)
-        assert "/* dummy github-markdown.css */" in html
+        assert "/* dummy github-markdown-light.css */" in html
 
     def test_contains_js(self, tmp_path):
         reader = TextReader("text", "README.md")

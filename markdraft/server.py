@@ -152,6 +152,11 @@ class PreviewServer(ThreadingHTTPServer):
 
         theme = cfg.get("theme", "light")
         data_color_mode = "dark" if theme == "dark" else "light"
+        markdown_css = (
+            "github-markdown-dark.css"
+            if theme == "dark"
+            else "github-markdown-light.css"
+        )
         highlight_css = (
             "github-highlight-dark.min.css"
             if theme == "dark"
@@ -184,6 +189,7 @@ class PreviewServer(ThreadingHTTPServer):
             title=page_title,
             favicon_url=static_url + "/favicon.ico",
             static_url=static_url,
+            markdown_css_url=static_url + "/" + markdown_css,
             highlight_css_url=static_url + "/" + highlight_css,
             katex_css_url=KATEX_CSS_URL,
             content_url=content_path,
