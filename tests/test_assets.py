@@ -5,8 +5,8 @@ Tests for the asset cache.
 import os
 from unittest import mock
 
-from grip.assets import AssetCache
-from grip.config import CDN_ASSETS
+from markdraft.assets import AssetCache
+from markdraft.config import CDN_ASSETS
 
 
 class TestAssetCache:
@@ -38,7 +38,7 @@ class TestAssetCache:
         cache_path = str(tmp_path / "cache")
         cache = AssetCache(cache_path)
 
-        with mock.patch("grip.assets.urllib.request.urlretrieve") as m:
+        with mock.patch("markdraft.assets.urllib.request.urlretrieve") as m:
             cache.ensure_cached(quiet=True)
             assert m.call_count == len(CDN_ASSETS)
 
@@ -47,7 +47,7 @@ class TestAssetCache:
             (tmp_path / filename).write_text("content")
         cache = AssetCache(str(tmp_path))
 
-        with mock.patch("grip.assets.urllib.request.urlretrieve") as m:
+        with mock.patch("markdraft.assets.urllib.request.urlretrieve") as m:
             cache.ensure_cached(quiet=True)
             assert m.call_count == 0
 

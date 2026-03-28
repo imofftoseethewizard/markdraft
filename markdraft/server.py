@@ -32,7 +32,7 @@ README_BODY = """\
                   <div id="readme" class="Box md Box--responsive">
                     {box_header}
                     <div class="Box-body px-5 pb-5">
-                      <article id="grip-content" class="markdown-body entry-content container-lg">
+                      <article id="markdraft-content" class="markdown-body entry-content container-lg">
                       </article>
                     </div>
                   </div>"""
@@ -57,7 +57,7 @@ USER_CONTENT_BODY = """\
                               <table class="d-block">
                                 <tbody class="d-block">
                                   <tr class="d-block">
-                                    <td class="d-block comment-body markdown-body" id="grip-content">
+                                    <td class="d-block comment-body markdown-body" id="markdraft-content">
                                     </td>
                                   </tr>
                                 </tbody>
@@ -77,7 +77,7 @@ COMMENT_HEADER = """\
                               </div>"""
 
 
-class GripServer(ThreadingHTTPServer):
+class PreviewServer(ThreadingHTTPServer):
     """Threaded HTTP server for markdown preview."""
 
     daemon_threads = True
@@ -91,10 +91,10 @@ class GripServer(ThreadingHTTPServer):
     ) -> None:
         self.reader = reader
         self.assets = assets
-        self.grip_config = config
+        self.server_config = config
         self.shutdown_event = threading.Event()
         self._template: str | None = None
-        super().__init__(address, GripHandler)
+        super().__init__(address, PreviewHandler)
 
     def get_template(self) -> str:
         if self._template is None:
@@ -105,14 +105,14 @@ class GripServer(ThreadingHTTPServer):
 
     def build_page(self, subpath: str | None = None) -> str:
         """Build the HTML shell for a markdown page."""
-        cfg = self.grip_config
+        cfg = self.server_config
         filename = self.reader.filename_for(subpath) or ""
         title = cfg.get("title") or filename
         display_title = html.escape(title or filename)
         page_title = (
             html.escape(title)
             if cfg.get("title")
-            else (html.escape(filename) + " - Grip" if filename else "Grip")
+            else (html.escape(filename) + " - Markdraft" if filename else "Markdraft")
         )
 
         theme = cfg.get("theme", "light")
@@ -123,14 +123,14 @@ class GripServer(ThreadingHTTPServer):
             else "github-highlight.min.css"
         )
 
-        static_url = cfg.get("grip_url", "/__") + "/static"
-        content_path = cfg.get("grip_url", "/__") + "/api/content"
+        static_url = cfg.get("url_prefix", "/__") + "/static"
+        content_path = cfg.get("url_prefix", "/__") + "/api/content"
         if subpath:
             content_path += "/" + subpath
 
         refresh_url = ""
         if cfg.get("autorefresh", True):
-            refresh_url = cfg.get("grip_url", "/__") + "/api/refresh"
+            refresh_url = cfg.get("url_prefix", "/__") + "/api/refresh"
             if subpath:
                 refresh_url += "/" + subpath
 
@@ -157,21 +157,21 @@ class GripServer(ThreadingHTTPServer):
         )
 
 
-class GripHandler(BaseHTTPRequestHandler):
+class PreviewHandler(BaseHTTPRequestHandler):
     """Request handler with routing."""
 
-    server: GripServer  # type: ignore[assignment]
+    server: PreviewServer  # type: ignore[assignment]
 
     def do_GET(self) -> None:
         path = urlparse(self.path).path
-        grip_url: str = self.server.grip_config.get("grip_url", "/__")
+        url_prefix: str = self.server.server_config.get("url_prefix", "/__")
 
-        if path.startswith(grip_url + "/api/content"):
-            self._handle_api_content(path, grip_url)
-        elif path.startswith(grip_url + "/api/refresh"):
-            self._handle_api_refresh(path, grip_url)
-        elif path.startswith(grip_url + "/static/"):
-            self._handle_static(path, grip_url)
+        if path.startswith(url_prefix + "/api/content"):
+            self._handle_api_content(path, url_prefix)
+        elif path.startswith(url_prefix + "/api/refresh"):
+            self._handle_api_refresh(path, url_prefix)
+        elif path.startswith(url_prefix + "/static/"):
+            self._handle_static(path, url_prefix)
         else:
             self._handle_page(path)
 
@@ -212,8 +212,8 @@ class GripHandler(BaseHTTPRequestHandler):
         page = self.server.build_page(subpath)
         self._send_text(200, page, "text/html; charset=utf-8")
 
-    def _handle_api_content(self, path: str, grip_url: str) -> None:
-        subpath = self._extract_subpath(path, grip_url + "/api/content")
+    def _handle_api_content(self, path: str, url_prefix: str) -> None:
+        subpath = self._extract_subpath(path, url_prefix + "/api/content")
         try:
             text = self.server.reader.read(subpath)
             filename = self.server.reader.filename_for(subpath) or ""
@@ -223,11 +223,11 @@ class GripHandler(BaseHTTPRequestHandler):
         body = json.dumps({"text": text, "filename": filename})
         self._send_text(200, body, "application/json; charset=utf-8")
 
-    def _handle_api_refresh(self, path: str, grip_url: str) -> None:
-        if not self.server.grip_config.get("autorefresh", True):
+    def _handle_api_refresh(self, path: str, url_prefix: str) -> None:
+        if not self.server.server_config.get("autorefresh", True):
             self._send_error(404)
             return
-        subpath = self._extract_subpath(path, grip_url + "/api/refresh")
+        subpath = self._extract_subpath(path, url_prefix + "/api/refresh")
 
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
@@ -240,14 +240,14 @@ class GripHandler(BaseHTTPRequestHandler):
             for _ in watcher.watch(self.server.shutdown_event):
                 self.wfile.write(b'data: {"updated": true}\r\n\r\n')
                 self.wfile.flush()
-                if not self.server.grip_config.get("quiet"):
+                if not self.server.server_config.get("quiet"):
                     filename = self.server.reader.filename_for(subpath) or "file"
                     print(" * Change detected in {0}, refreshing".format(filename))
         except (BrokenPipeError, ConnectionResetError):
             pass
 
-    def _handle_static(self, path: str, grip_url: str) -> None:
-        prefix = grip_url + "/static/"
+    def _handle_static(self, path: str, url_prefix: str) -> None:
+        prefix = url_prefix + "/static/"
         filename = path[len(prefix) :]
         if not filename or ".." in filename:
             self._send_error(404)
@@ -301,5 +301,5 @@ class GripHandler(BaseHTTPRequestHandler):
         self.wfile.write(str(code).encode())
 
     def log_message(self, format: str, *args: Any) -> None:
-        if not self.server.grip_config.get("quiet"):
+        if not self.server.server_config.get("quiet"):
             super().log_message(format, *args)

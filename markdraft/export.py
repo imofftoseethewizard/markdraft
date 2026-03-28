@@ -43,10 +43,10 @@ EXPORT_TEMPLATE = """\
       </main>
     </div>
   </div>
-  <script id="grip-source" type="text/markdown">{escaped_markdown}</script>
+  <script id="markdraft-source" type="text/markdown">{escaped_markdown}</script>
 {script_assets}
   <script>
-{grip_js}
+{client_js}
   </script>
 </body>
 </html>"""
@@ -55,7 +55,7 @@ README_BODY = """\
                   <div id="readme" class="Box md Box--responsive">
                     {box_header}
                     <div class="Box-body px-5 pb-5">
-                      <article id="grip-content" class="markdown-body entry-content container-lg">
+                      <article id="markdraft-content" class="markdown-body entry-content container-lg">
                       </article>
                     </div>
                   </div>"""
@@ -71,7 +71,7 @@ USER_CONTENT_BODY = """\
                               <table class="d-block">
                                 <tbody class="d-block">
                                   <tr class="d-block">
-                                    <td class="d-block comment-body markdown-body" id="grip-content">
+                                    <td class="d-block comment-body markdown-body" id="markdraft-content">
                                     </td>
                                   </tr>
                                 </tbody>
@@ -83,7 +83,7 @@ USER_CONTENT_BODY = """\
                     </div>
                   </div>"""
 
-GRIP_JS_DIR = os.path.join(os.path.dirname(__file__), "static")
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
 
 def export_page(
@@ -107,7 +107,7 @@ def export_page(
     text = raw if isinstance(raw, str) else raw.decode("utf-8")
     filename = reader.filename_for(subpath) or ""
 
-    page_title = title if title else (filename + " - Grip" if filename else "Grip")
+    page_title = title if title else (filename + " - Markdraft" if filename else "Markdraft")
     display_title = html.escape(title or filename)
     data_color_mode = "dark" if theme == "dark" else "light"
 
@@ -178,10 +178,10 @@ def export_page(
             '  <script src="{2}"></script>'
         ).format(cdn["marked.min.js"], cdn["highlight.min.js"], cdn["mermaid.min.js"])
 
-    # Read grip.js
-    grip_js_path = os.path.join(GRIP_JS_DIR, "grip.js")
-    with open(grip_js_path, "r", encoding="utf-8") as f:
-        grip_js = f.read()
+    # Read markdraft.js
+    client_js_path = os.path.join(STATIC_DIR, "markdraft.js")
+    with open(client_js_path, "r", encoding="utf-8") as f:
+        client_js = f.read()
 
     page = EXPORT_TEMPLATE.format(
         title=html.escape(page_title),
@@ -190,7 +190,7 @@ def export_page(
         page_body=page_body,
         escaped_markdown=escaped_markdown,
         script_assets=script_assets,
-        grip_js=grip_js,
+        client_js=client_js,
     )
 
     if out_file == "-":

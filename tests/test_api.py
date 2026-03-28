@@ -1,5 +1,5 @@
 """
-Tests for Grip's public API and core components.
+Tests for Markdraft's public API and core components.
 """
 
 import os
@@ -7,7 +7,7 @@ import posixpath
 
 import pytest
 
-from grip import (
+from markdraft import (
     DEFAULT_FILENAME,
     DirectoryReader,
     ReadmeNotFoundError,
@@ -16,7 +16,7 @@ from grip import (
     clear_cache,
     export,
 )
-from grip.assets import AssetCache
+from markdraft.assets import AssetCache
 
 DIRNAME = os.path.dirname(os.path.abspath(__file__))
 
@@ -179,7 +179,7 @@ class TestAssetCache:
 class TestExport:
 
     def test_export_to_file(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("GRIPHOME", str(tmp_path / ".grip"))
+        monkeypatch.setenv("MARKDRAFT_HOME", str(tmp_path / ".markdraft"))
         md = tmp_path / "README.md"
         md.write_text("# Export Test")
         out = str(tmp_path / "out.html")
@@ -190,7 +190,7 @@ class TestExport:
         assert "# Export Test" in html
 
     def test_export_to_stdout(self, tmp_path, monkeypatch, capsys):
-        monkeypatch.setenv("GRIPHOME", str(tmp_path / ".grip"))
+        monkeypatch.setenv("MARKDRAFT_HOME", str(tmp_path / ".markdraft"))
         md = tmp_path / "README.md"
         md.write_text("# Stdout")
         export(str(tmp_path), out_filename="-", quiet=True)
@@ -201,5 +201,5 @@ class TestExport:
 class TestClearCache:
 
     def test_clear_cache(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("GRIPHOME", str(tmp_path))
+        monkeypatch.setenv("MARKDRAFT_HOME", str(tmp_path))
         clear_cache()  # should not raise

@@ -1,5 +1,5 @@
 """
-Grip command-line interface.
+Markdraft command-line interface.
 """
 
 import argparse
@@ -11,7 +11,7 @@ from . import __version__
 from .api import clear_cache, export, serve
 from .exceptions import ReadmeNotFoundError
 
-version = "Grip " + __version__
+version = "Markdraft " + __version__
 
 VALID_THEME_OPTIONS = ["light", "dark"]
 
@@ -46,7 +46,7 @@ def _resolve_path_address(path_arg, address_arg):
 
 def _build_parser():
     parser = argparse.ArgumentParser(
-        prog="grip",
+        prog="draft",
         description="Render local readme files before sending off to GitHub.",
         add_help=True,
     )
@@ -86,12 +86,12 @@ def main(argv=None):
 
     # Legacy flag errors
     if "-a" in argv or "--address" in argv:
-        print("Use grip [options] <path> <address> instead of -a")
-        print("See grip -h for details")
+        print("Use draft [options] <path> <address> instead of -a")
+        print("See draft -h for details")
         return 2
     if "-p" in argv or "--port" in argv:
-        print("Use grip [options] [<path>] [<hostname>:]<port> instead of -p")
-        print("See grip -h for details")
+        print("Use draft [options] [<path>] [<hostname>:]<port> instead of -p")
+        print("See draft -h for details")
         return 2
 
     parser = _build_parser()
@@ -161,7 +161,7 @@ def main(argv=None):
         print("Error:", ex)
         if ex.errno == errno.EADDRINUSE:
             print(
-                "This port is in use. Is a grip server already running? "
+                "This port is in use. Is a markdraft server already running? "
                 "Stop that instance or specify another port here."
             )
         return 1

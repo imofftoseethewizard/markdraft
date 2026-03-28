@@ -1,7 +1,7 @@
 """
-Grip configuration.
+Markdraft configuration.
 
-Constants and defaults. User overrides go in ~/.grip/settings.py.
+Constants and defaults. User overrides go in ~/.markdraft/settings.py.
 """
 
 import os
@@ -18,10 +18,10 @@ DEFAULT_FILENAME = DEFAULT_FILENAMES[0]
 
 # -- Paths and URLs -----------------------------------------------------------
 
-DEFAULT_GRIPHOME = "~/.grip"
-DEFAULT_GRIPURL = "/__"
+DEFAULT_CONFIG_HOME = "~/.markdraft"
+DEFAULT_URL_PREFIX = "/__"
 
-# -- Server defaults (overridable via ~/.grip/settings.py) --------------------
+# -- Server defaults (overridable via ~/.markdraft/settings.py) ---------------
 
 HOST = "localhost"
 PORT = 6419
@@ -41,19 +41,19 @@ CDN_ASSETS = {
 }
 
 
-def load_user_settings(griphome=None):
-    """Load user settings from ~/.grip/settings.py.
+def load_user_settings(config_home: str | None = None) -> dict[str, object]:
+    """Load user settings from ~/.markdraft/settings.py.
 
     Returns a dict of uppercase variable names to their values.
     Only HOST, PORT, AUTOREFRESH, QUIET are recognized.
     """
-    if griphome is None:
-        griphome = os.environ.get("GRIPHOME", DEFAULT_GRIPHOME)
-    griphome = os.path.expanduser(griphome)
-    settings_file = os.path.join(griphome, "settings.py")
+    if config_home is None:
+        config_home = os.environ.get("MARKDRAFT_HOME", DEFAULT_CONFIG_HOME)
+    config_home = os.path.expanduser(config_home)
+    settings_file = os.path.join(config_home, "settings.py")
     if not os.path.isfile(settings_file):
         return {}
-    ns = {}
+    ns: dict[str, object] = {}
     with open(settings_file) as f:
         exec(compile(f.read(), settings_file, "exec"), ns)
     return {k: v for k, v in ns.items() if k.isupper()}

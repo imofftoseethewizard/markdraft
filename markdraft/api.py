@@ -1,5 +1,5 @@
 """
-Public API for Grip.
+Public API for Markdraft.
 """
 
 import os
@@ -10,7 +10,7 @@ from . import __version__
 from .assets import AssetCache
 from .browser import start_browser_when_ready
 from .config import (
-    DEFAULT_GRIPHOME,
+    DEFAULT_CONFIG_HOME,
     CACHE_DIRECTORY,
     HOST,
     PORT,
@@ -21,7 +21,7 @@ from .config import (
 from .exceptions import ReadmeNotFoundError
 from .export import export_page
 from .readers import DirectoryReader, ReadmeReader, StdinReader, TextReader
-from .server import GripServer
+from .server import PreviewServer
 
 
 def _resolve_config(
@@ -33,7 +33,7 @@ def _resolve_config(
     title: str | None = None,
     user_content: bool = False,
     wide: bool = False,
-    grip_url: str = "/__",
+    url_prefix: str = "/__",
 ) -> dict[str, Any]:
     """Build a config dict from arguments + user settings."""
     settings = load_user_settings()
@@ -50,7 +50,7 @@ def _resolve_config(
         title=title,
         user_content=user_content,
         wide=wide,
-        grip_url=grip_url,
+        url_prefix=url_prefix,
     )
 
 
@@ -67,9 +67,9 @@ def _make_reader(path: str | None = None, text: str | None = None) -> ReadmeRead
 
 def _make_cache() -> AssetCache:
     """Create an AssetCache with the default cache path."""
-    griphome = os.path.expanduser(os.environ.get("GRIPHOME", DEFAULT_GRIPHOME))
+    config_home = os.path.expanduser(os.environ.get("MARKDRAFT_HOME", DEFAULT_CONFIG_HOME))
     cache_dir = CACHE_DIRECTORY.format(version=__version__)
-    cache_path = os.path.join(griphome, cache_dir)
+    cache_path = os.path.join(config_home, cache_dir)
     return AssetCache(cache_path)
 
 
@@ -95,7 +95,7 @@ def serve(
     assets.ensure_cached(quiet=bool(config["quiet"]))
 
     address = (config["host"], config["port"])
-    server = GripServer(address, reader, assets, config)
+    server = PreviewServer(address, reader, assets, config)
 
     if not config["quiet"]:
         print(" * Serving on http://{0}:{1}/".format(*address), file=sys.stderr)

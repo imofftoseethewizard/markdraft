@@ -9,13 +9,13 @@ sys.path.insert(1, os.path.dirname(DIRNAME))
 
 import pytest  # noqa: E402
 
-from grip.assets import AssetCache  # noqa: E402
-from grip.readers import DirectoryReader, TextReader  # noqa: E402
-from grip.server import GripServer  # noqa: E402
+from markdraft.assets import AssetCache  # noqa: E402
+from markdraft.readers import DirectoryReader, TextReader  # noqa: E402
+from markdraft.server import PreviewServer  # noqa: E402
 
 
 class TestClient:
-    """Simple HTTP test client for GripServer."""
+    """Simple HTTP test client for PreviewServer."""
 
     def __init__(self, host, port):
         self.base_url = "http://{0}:{1}".format(host, port)
@@ -54,8 +54,8 @@ class MockAssetCache(AssetCache):
 
 
 @pytest.fixture
-def grip_server(tmp_path):
-    """Factory fixture that starts a GripServer on a random port."""
+def preview_server(tmp_path):
+    """Factory fixture that starts a PreviewServer on a random port."""
     servers = []
 
     def _make(reader, **config_overrides):
@@ -68,10 +68,10 @@ def grip_server(tmp_path):
             title=None,
             user_content=False,
             wide=False,
-            grip_url="/__",
+            url_prefix="/__",
         )
         config.update(config_overrides)
-        server = GripServer(("127.0.0.1", 0), reader, assets, config)
+        server = PreviewServer(("127.0.0.1", 0), reader, assets, config)
         host, port = server.server_address
         thread = threading.Thread(target=server.serve_forever)
         thread.daemon = True
@@ -87,19 +87,19 @@ def grip_server(tmp_path):
 
 
 @pytest.fixture
-def grip_text_server(tmp_path, grip_server):
+def text_server(tmp_path, preview_server):
     """Factory: create a server serving in-memory text."""
 
     def _make(text, **kwargs):
         filename = kwargs.pop("display_filename", "README.md")
         reader = TextReader(text, filename)
-        return grip_server(reader, **kwargs)
+        return preview_server(reader, **kwargs)
 
     return _make
 
 
 @pytest.fixture
-def grip_dir_server(tmp_path, grip_server):
+def dir_server(tmp_path, preview_server):
     """Factory: create a server serving a temp directory."""
 
     def _make(files, **kwargs):
@@ -113,6 +113,6 @@ def grip_dir_server(tmp_path, grip_server):
             else:
                 path.write_text(content)
         reader = DirectoryReader(str(content_dir))
-        return grip_server(reader, **kwargs)
+        return preview_server(reader, **kwargs)
 
     return _make

@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  var app = document.getElementById('grip-app');
+  var app = document.getElementById('markdraft-app');
   var contentUrl = app.getAttribute('data-content-url');
   var refreshUrl = app.getAttribute('data-refresh-url');
   var theme = app.getAttribute('data-theme') || 'light';
@@ -47,7 +47,7 @@
 
   function renderMarkdown(text) {
     var html = marked.parse(text, { renderer: renderer });
-    document.getElementById('grip-content').innerHTML = html;
+    document.getElementById('markdraft-content').innerHTML = html;
     initMermaid();
   }
 
@@ -59,7 +59,7 @@
         renderMarkdown(data.text);
       })
       .catch(function (err) {
-        document.getElementById('grip-content').innerHTML =
+        document.getElementById('markdraft-content').innerHTML =
           '<p style="color:red">Error loading content: ' + escapeHtml(String(err)) + '</p>';
       });
   }
@@ -114,7 +114,7 @@
   }
 
   // Boot
-  var embedded = document.getElementById('grip-source');
+  var embedded = document.getElementById('markdraft-source');
   if (embedded) {
     renderMarkdown(embedded.textContent);
   } else {

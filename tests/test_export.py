@@ -4,9 +4,9 @@ Tests for HTML export.
 
 import os
 
-from grip.assets import AssetCache
-from grip.export import export_page
-from grip.readers import TextReader
+from markdraft.assets import AssetCache
+from markdraft.export import export_page
+from markdraft.readers import TextReader
 
 
 class MockAssetCache(AssetCache):
@@ -54,11 +54,11 @@ class TestExport:
         html = export_page(reader, None, assets)
         assert "/* dummy github-markdown.css */" in html
 
-    def test_inline_contains_grip_js(self, tmp_path):
+    def test_inline_contains_markdraft_js(self, tmp_path):
         reader = TextReader("text", "README.md")
         assets = MockAssetCache(str(tmp_path / "cache"))
         html = export_page(reader, None, assets)
-        assert "grip-source" in html
+        assert "markdraft-source" in html
         assert "marked.parse" in html
 
     def test_no_inline_uses_cdn_links(self, tmp_path):
@@ -87,7 +87,7 @@ class TestExport:
         assets = MockAssetCache(str(tmp_path / "cache"))
         html = export_page(reader, None, assets)
         # The </script in the markdown must be escaped
-        assert "</script>more" not in html.split("grip-source")[1].split("</script")[0]
+        assert "</script>more" not in html.split("markdraft-source")[1].split("</script")[0]
         assert "<\\/script" in html
 
     def test_export_to_stdout(self, tmp_path, capsys):

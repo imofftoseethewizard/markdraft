@@ -1,10 +1,9 @@
 """\
-Grip
-----
+Markdraft
+---------
 
-Render local readme files before sending off to GitHub.
+Preview local markdown files with mermaid diagram support.
 
-:copyright: (c) 2014-2022 by Joe Esposito.
 :license: MIT, see LICENSE for more details.
 """
 
@@ -15,8 +14,8 @@ from .command import main
 from .config import (
     DEFAULT_FILENAMES,
     DEFAULT_FILENAME,
-    DEFAULT_GRIPHOME,
-    DEFAULT_GRIPURL,
+    DEFAULT_CONFIG_HOME,
+    DEFAULT_URL_PREFIX,
     SUPPORTED_EXTENSIONS,
     SUPPORTED_TITLES,
 )
@@ -27,8 +26,8 @@ __all__ = [
     "__version__",
     "DEFAULT_FILENAMES",
     "DEFAULT_FILENAME",
-    "DEFAULT_GRIPHOME",
-    "DEFAULT_GRIPURL",
+    "DEFAULT_CONFIG_HOME",
+    "DEFAULT_URL_PREFIX",
     "SUPPORTED_EXTENSIONS",
     "SUPPORTED_TITLES",
     "ReadmeNotFoundError",
