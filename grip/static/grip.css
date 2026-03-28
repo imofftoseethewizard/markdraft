@@ -1,0 +1,11 @@
+.preview-page {
+  margin-top: 64px;
+  margin-bottom: 21px;
+}
+.timeline-comment-wrapper > .timeline-comment:after,
+.timeline-comment-wrapper > .timeline-comment:before {
+  content: none;
+}
+.discussion-timeline.wide {
+  width: 920px;
+}

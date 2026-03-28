@@ -1,24 +1,14 @@
 """
-Grip
-----
+Gripper
+-------
 
-Render local readme files before sending off to GitHub.
-
-
-Grip is easy to set up
-``````````````````````
+Render local readme files with mermaid diagram support.
 
 ::
 
-    $ pip install grip
+    $ pip install gripper
     $ cd myproject
-    $ grip
-
-
-Links
-`````
-
-* `Website <http://github.com/joeyespo/grip>`_
+    $ gripper
 
 """
 
@@ -31,20 +21,22 @@ def read(filename):
         return f.read()
 
 
+def read_requirements(filename):
+    lines = read(filename).splitlines()
+    return [l.strip() for l in lines if l.strip()]
+
+
 setup(
-    name='grip',
-    version='4.6.2',
-    description='Render local readme files before sending off to GitHub.',
+    name='gripper',
+    version='5.0.0',
+    description='Render local readme files with mermaid diagram support.',
     long_description=__doc__,
-    author='Joe Esposito',
-    author_email='joe@joeyespo.com',
-    url='http://github.com/joeyespo/grip',
     license='MIT',
     platforms='any',
     packages=find_packages(),
-    package_data={'grip': ['static/*.*', 'static/octicons/*', 'templates/*']},
-    install_requires=read('requirements.txt').splitlines(),
-    extras_require={'tests': read('requirements-test.txt').splitlines()},
+    package_data={'grip': ['static/*.*', 'static/octicons/*']},
+    install_requires=[],
+    extras_require={'tests': read_requirements('requirements-test.txt')},
     zip_safe=False,
     entry_points={'console_scripts': ['grip = grip:main', 'gripper = grip:main']},
 )

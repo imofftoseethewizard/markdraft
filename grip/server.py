@@ -1,0 +1,289 @@
+"""
+HTTP server for serving markdown previews.
+
+Replaces Flask with stdlib http.server. All markdown rendering happens
+client-side via marked.js, highlight.js, and mermaid.js.
+"""
+
+import html
+import json
+import mimetypes
+import os
+import posixpath
+import threading
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse
+
+from .exceptions import ReadmeNotFoundError
+from .watcher import FileWatcher
+
+
+# Ensure common font types are registered
+mimetypes.add_type('application/x-font-woff', '.woff')
+mimetypes.add_type('application/octet-stream', '.ttf')
+mimetypes.add_type('application/javascript', '.js')
+
+STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
+
+# Page body variants for template.html
+README_BODY = """\
+                  <div id="readme" class="Box md Box--responsive">
+                    {box_header}
+                    <div class="Box-body px-5 pb-5">
+                      <article id="grip-content" class="markdown-body entry-content container-lg">
+                      </article>
+                    </div>
+                  </div>"""
+
+BOX_HEADER = """\
+<div class="Box-header d-flex border-bottom-0 flex-items-center flex-justify-between color-bg-default rounded-top-2">
+                        <div class="d-flex flex-items-center">
+                          <h2 class="Box-title">
+                            {display_title}
+                          </h2>
+                        </div>
+                      </div>"""
+
+USER_CONTENT_BODY = """\
+                  <div class="pull-discussion-timeline">
+                    <div class="ml-0 pl-0 ml-md-6 pl-md-3">
+                      <div class="TimelineItem pt-0">
+                        <div class="timeline-comment-group TimelineItem-body my-0">
+                          <div class="ml-n3 timeline-comment unminimized-comment comment previewable-edit editable-comment timeline-comment--caret reorderable-task-lists">
+                            {comment_header}
+                            <div class="edit-comment-hide">
+                              <table class="d-block">
+                                <tbody class="d-block">
+                                  <tr class="d-block">
+                                    <td class="d-block comment-body markdown-body" id="grip-content">
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>"""
+
+COMMENT_HEADER = """\
+<div class="timeline-comment-header clearfix d-block d-sm-flex">
+                                <h3 class="timeline-comment-header-text f5 text-normal">
+                                  <strong class="css-truncate expandable"><span class="author text-inherit css-truncate-target">{title}</span></strong>
+                                </h3>
+                              </div>"""
+
+
+class GripServer(ThreadingHTTPServer):
+    """Threaded HTTP server for markdown preview."""
+
+    daemon_threads = True
+
+    def __init__(self, address, reader, assets, config):
+        self.reader = reader
+        self.assets = assets
+        self.grip_config = config
+        self.shutdown_event = threading.Event()
+        self._template = None
+        super().__init__(address, GripHandler)
+
+    def get_template(self):
+        if self._template is None:
+            path = os.path.join(STATIC_DIR, 'template.html')
+            with open(path, 'r', encoding='utf-8') as f:
+                self._template = f.read()
+        return self._template
+
+    def build_page(self, subpath=None):
+        """Build the HTML shell for a markdown page."""
+        cfg = self.grip_config
+        filename = self.reader.filename_for(subpath) or ''
+        title = cfg.get('title') or filename
+        display_title = html.escape(title or filename)
+        page_title = html.escape(title) if cfg.get('title') else (
+            html.escape(filename) + ' - Grip' if filename else 'Grip')
+
+        theme = cfg.get('theme', 'light')
+        data_color_mode = 'dark' if theme == 'dark' else 'light'
+        highlight_css = ('github-highlight-dark.min.css'
+                         if theme == 'dark' else
+                         'github-highlight.min.css')
+
+        static_url = cfg.get('grip_url', '/__') + '/static'
+        content_path = cfg.get('grip_url', '/__') + '/api/content'
+        if subpath:
+            content_path += '/' + subpath
+
+        refresh_url = ''
+        if cfg.get('autorefresh', True):
+            refresh_url = cfg.get('grip_url', '/__') + '/api/refresh'
+            if subpath:
+                refresh_url += '/' + subpath
+
+        if cfg.get('user_content'):
+            comment_header = ''
+            if display_title:
+                comment_header = COMMENT_HEADER.format(title=display_title)
+            page_body = USER_CONTENT_BODY.format(
+                comment_header=comment_header)
+        else:
+            box_header = ''
+            if display_title:
+                box_header = BOX_HEADER.format(display_title=display_title)
+            page_body = README_BODY.format(box_header=box_header)
+
+        return self.get_template().format(
+            title=page_title,
+            favicon_url=static_url + '/favicon.ico',
+            static_url=static_url,
+            highlight_css_url=static_url + '/' + highlight_css,
+            content_url=content_path,
+            refresh_url=refresh_url,
+            data_color_mode=data_color_mode,
+            page_body=page_body,
+        )
+
+
+class GripHandler(BaseHTTPRequestHandler):
+    """Request handler with routing."""
+
+    def do_GET(self):
+        path = urlparse(self.path).path
+        grip_url = self.server.grip_config.get('grip_url', '/__')
+
+        if path.startswith(grip_url + '/api/content'):
+            self._handle_api_content(path, grip_url)
+        elif path.startswith(grip_url + '/api/refresh'):
+            self._handle_api_refresh(path, grip_url)
+        elif path.startswith(grip_url + '/static/'):
+            self._handle_static(path, grip_url)
+        else:
+            self._handle_page(path)
+
+    def _handle_page(self, path):
+        subpath = path.lstrip('/') or None
+
+        try:
+            normalized = self.server.reader.normalize_subpath(subpath)
+        except ReadmeNotFoundError:
+            self._send_error(404)
+            return
+
+        if normalized != subpath:
+            self._send_redirect('/' + (normalized or ''))
+            return
+
+        # Binary files
+        if self.server.reader.is_binary(subpath):
+            try:
+                data = self.server.reader.read(subpath)
+            except ReadmeNotFoundError:
+                self._send_error(404)
+                return
+            mimetype = self.server.reader.mimetype_for(subpath) or 'application/octet-stream'
+            self._send_bytes(200, data, mimetype)
+            return
+
+        # Verify the file exists before serving the shell
+        try:
+            self.server.reader.read(subpath)
+        except ReadmeNotFoundError:
+            self._send_error(404)
+            return
+
+        page = self.server.build_page(subpath)
+        self._send_text(200, page, 'text/html; charset=utf-8')
+
+    def _handle_api_content(self, path, grip_url):
+        subpath = self._extract_subpath(path, grip_url + '/api/content')
+        try:
+            text = self.server.reader.read(subpath)
+            filename = self.server.reader.filename_for(subpath) or ''
+        except ReadmeNotFoundError:
+            self._send_error(404)
+            return
+        body = json.dumps({'text': text, 'filename': filename})
+        self._send_text(200, body, 'application/json; charset=utf-8')
+
+    def _handle_api_refresh(self, path, grip_url):
+        if not self.server.grip_config.get('autorefresh', True):
+            self._send_error(404)
+            return
+        subpath = self._extract_subpath(path, grip_url + '/api/refresh')
+
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Connection', 'keep-alive')
+        self.end_headers()
+
+        watcher = FileWatcher(self.server.reader, subpath)
+        try:
+            for _ in watcher.watch(self.server.shutdown_event):
+                self.wfile.write(b'data: {"updated": true}\r\n\r\n')
+                self.wfile.flush()
+                if not self.server.grip_config.get('quiet'):
+                    filename = self.server.reader.filename_for(subpath) or 'file'
+                    print(' * Change detected in {0}, refreshing'.format(
+                        filename))
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
+    def _handle_static(self, path, grip_url):
+        prefix = grip_url + '/static/'
+        filename = path[len(prefix):]
+        if not filename or '..' in filename:
+            self._send_error(404)
+            return
+
+        # Check bundled static dir first
+        bundled = os.path.join(STATIC_DIR, filename)
+        if os.path.isfile(bundled):
+            self._serve_file(bundled)
+            return
+
+        # Check asset cache
+        cached = self.server.assets.get_path(filename)
+        if os.path.isfile(cached):
+            self._serve_file(cached)
+            return
+
+        self._send_error(404)
+
+    def _serve_file(self, filepath):
+        mimetype, _ = mimetypes.guess_type(filepath)
+        if mimetype is None:
+            mimetype = 'application/octet-stream'
+        with open(filepath, 'rb') as f:
+            data = f.read()
+        self._send_bytes(200, data, mimetype)
+
+    def _extract_subpath(self, path, prefix):
+        sub = path[len(prefix):].strip('/')
+        return sub or None
+
+    def _send_text(self, code, text, content_type):
+        self._send_bytes(code, text.encode('utf-8'), content_type)
+
+    def _send_bytes(self, code, data, content_type):
+        self.send_response(code)
+        self.send_header('Content-Type', content_type)
+        self.send_header('Content-Length', str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _send_redirect(self, location):
+        self.send_response(302)
+        self.send_header('Location', location)
+        self.end_headers()
+
+    def _send_error(self, code):
+        self.send_response(code)
+        self.send_header('Content-Type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(str(code).encode())
+
+    def log_message(self, format, *args):
+        if not self.server.grip_config.get('quiet'):
+            super().log_message(format, *args)

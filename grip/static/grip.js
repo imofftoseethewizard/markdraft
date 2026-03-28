@@ -1,78 +1,130 @@
 (function () {
   'use strict';
 
-  function showCanonicalImages() {
-    var images = document.getElementsByTagName('img');
-    if (!images) {
-      return;
-    }
-    for (var index = 0; index < images.length; index++) {
-      var image = images[index];
-      if (image.getAttribute('data-canonical-src') && image.src !== image.getAttribute('data-canonical-src')) {
-        image.src = image.getAttribute('data-canonical-src');
+  var app = document.getElementById('grip-app');
+  var contentUrl = app.getAttribute('data-content-url');
+  var refreshUrl = app.getAttribute('data-refresh-url');
+  var theme = app.getAttribute('data-theme') || 'light';
+
+  // Configure marked with highlight.js
+  marked.setOptions({
+    gfm: true,
+    breaks: false,
+    highlight: function (code, lang) {
+      if (lang && typeof hljs !== 'undefined' && hljs.getLanguage(lang)) {
+        try { return hljs.highlight(code, { language: lang }).value; }
+        catch (e) { /* fall through */ }
       }
+      if (typeof hljs !== 'undefined') {
+        try { return hljs.highlightAuto(code).value; }
+        catch (e) { /* fall through */ }
+      }
+      return code;
     }
+  });
+
+  // Custom renderer: mermaid code blocks become <pre class="mermaid">
+  var renderer = new marked.Renderer();
+  var origCode = renderer.code;
+  renderer.code = function (code, language, escaped) {
+    if (language === 'mermaid') {
+      return '<pre class="mermaid">' + escapeHtml(code) + '</pre>';
+    }
+    if (origCode) {
+      return origCode.call(this, code, language, escaped);
+    }
+    var esc = escapeHtml(code);
+    if (language) {
+      return '<pre><code class="hljs language-' + escapeHtml(language) + '">' + esc + '</code></pre>';
+    }
+    return '<pre><code>' + esc + '</code></pre>';
+  };
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  function scrollToHash() {
-    if (location.hash && !document.querySelector(':target')) {
-      var element = document.getElementById('user-content-' + location.hash.slice(1));
-      if (element) {
-        element.scrollIntoView();
-      }
-    }
+  function renderMarkdown(text) {
+    var html = marked.parse(text, { renderer: renderer });
+    document.getElementById('grip-content').innerHTML = html;
+    initMermaid();
   }
 
-  function autorefreshContent(eventSourceUrl) {
-    var initialTitle = document.title;
-    var contentElement = document.getElementById('grip-content');
-    var source = new EventSource(eventSourceUrl);
-    var isRendering = false;
-
-    source.onmessage = function (ev) {
-      var msg = JSON.parse(ev.data);
-      if (msg.updating) {
-        isRendering = true;
-        document.title = '(Rendering) ' + document.title;
-      } else {
-        isRendering = false;
-        document.title = initialTitle;
-        contentElement.innerHTML = msg.content;
-        showCanonicalImages();
-      }
-    };
-
-    source.onerror = function (e) {
-      if (e.readyState === EventSource.CLOSED && isRendering) {
-        isRendering = false;
-        document.title = initialTitle;
-      }
-    };
+  function fetchAndRender() {
+    if (!contentUrl) return;
+    fetch(contentUrl)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        renderMarkdown(data.text);
+      })
+      .catch(function (err) {
+        document.getElementById('grip-content').innerHTML =
+          '<p style="color:red">Error loading content: ' + escapeHtml(String(err)) + '</p>';
+      });
   }
 
   function initMermaid() {
     if (typeof mermaid !== 'undefined') {
-      mermaid.initialize({ startOnLoad: true });
+      try {
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: theme === 'dark' ? 'dark' : 'default'
+        });
+        mermaid.run({ querySelector: '.mermaid' });
+      } catch (e) {
+        // mermaid may not be loaded yet
+      }
     }
   }
 
-  function init() {
-    showCanonicalImages();
-    initMermaid();
+  function autorefresh(url) {
+    var initialTitle = document.title;
+    var source = new EventSource(url);
+    var isRendering = false;
 
-    var autorefreshUrl = document.getElementById('preview-page').getAttribute('data-autorefresh-url');
-    if (autorefreshUrl) {
-      autorefreshContent(autorefreshUrl);
+    source.onmessage = function (ev) {
+      var msg = JSON.parse(ev.data);
+      if (msg.updated) {
+        isRendering = true;
+        document.title = '(Rendering) ' + initialTitle;
+        fetchAndRender();
+        setTimeout(function () {
+          isRendering = false;
+          document.title = initialTitle;
+        }, 200);
+      }
+    };
+
+    source.onerror = function () {
+      if (isRendering) {
+        isRendering = false;
+        document.title = initialTitle;
+      }
+    };
+  }
+
+  function scrollToHash() {
+    if (location.hash && !document.querySelector(':target')) {
+      var id = location.hash.slice(1);
+      var el = document.getElementById(id) ||
+               document.getElementById('user-content-' + id);
+      if (el) el.scrollIntoView();
     }
   }
 
-  window.onhashchange = function () {
-    scrollToHash();
-  };
+  // Boot
+  var embedded = document.getElementById('grip-source');
+  if (embedded) {
+    renderMarkdown(embedded.textContent);
+  } else {
+    fetchAndRender();
+  }
 
-  window.onload = function () {
-    scrollToHash();
-  };
+  if (refreshUrl) {
+    autorefresh(refreshUrl);
+  }
 
-  init();
+  window.onhashchange = scrollToHash;
+  window.onload = scrollToHash;
 })();

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en" data-color-mode="{data_color_mode}" data-light-theme="light" data-dark-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>{title}</title>
+  <link rel="icon" href="{favicon_url}" />
+  <link rel="stylesheet" href="{static_url}/github-markdown.css" />
+  <link rel="stylesheet" href="{highlight_css_url}" />
+  <link rel="stylesheet" href="{static_url}/octicons/octicons.css" />
+  <link rel="stylesheet" href="{static_url}/grip.css" />
+</head>
+<body>
+  <div class="page">
+    <div id="grip-app"
+         data-content-url="{content_url}"
+         data-refresh-url="{refresh_url}"
+         data-theme="{data_color_mode}"
+         class="preview-page">
+      <main id="js-repo-pjax-container">
+        <div class="clearfix new-discussion-timeline container-xl px-3 px-md-4 px-lg-5">
+          <div class="repository-content">
+            <div class="clearfix">
+              <div class="Layout Layout--flowRow-until-md Layout--sidebarPosition-end Layout--sidebarPosition-flowRow-end">
+                <div class="Layout-main">
+{page_body}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+  <script src="{static_url}/marked.min.js"></script>
+  <script src="{static_url}/highlight.min.js"></script>
+  <script src="{static_url}/mermaid.min.js"></script>
+  <script src="{static_url}/grip.js"></script>
+</body>
+</html>

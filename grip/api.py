@@ -1,127 +1,125 @@
-import io
+"""
+Public API for Grip.
+"""
+
 import os
 import sys
-import errno
 
-from .app import Grip
+from . import __version__
+from .assets import AssetCache
+from .browser import start_browser_when_ready
+from .config import (
+    DEFAULT_GRIPHOME, CACHE_DIRECTORY, HOST, PORT,
+    AUTOREFRESH, QUIET, load_user_settings)
+from .exceptions import ReadmeNotFoundError
+from .export import export_page
 from .readers import DirectoryReader, StdinReader, TextReader
-from .mermaid import GripperRenderer
-from .renderers import GitHubRenderer, OfflineRenderer
+from .server import GripServer
 
 
-def create_app(path=None, user_content=False, context=None, username=None,
-               password=None, render_offline=False, render_wide=False,
-               render_inline=False, api_url=None, title=None, text=None,
-               autorefresh=None, quiet=None, theme='light', grip_class=None):
-    """
-    Creates a Grip application with the specified overrides.
-    """
-    # Customize the app
-    if grip_class is None:
-        grip_class = Grip
+def _resolve_config(host=None, port=None, autorefresh=None, quiet=None,
+                    theme='light', title=None, user_content=False,
+                    wide=False, grip_url='/__'):
+    """Build a config dict from arguments + user settings."""
+    settings = load_user_settings()
+    return dict(
+        host=host or settings.get('HOST', HOST),
+        port=port if port is not None else settings.get('PORT', PORT),
+        autorefresh=(autorefresh if autorefresh is not None
+                     else settings.get('AUTOREFRESH', AUTOREFRESH)),
+        quiet=quiet if quiet is not None else settings.get('QUIET', QUIET),
+        theme=theme,
+        title=title,
+        user_content=user_content,
+        wide=wide,
+        grip_url=grip_url,
+    )
 
-    # Customize the reader
+
+def _make_reader(path=None, text=None):
+    """Create the appropriate reader for the given arguments."""
     if text is not None:
         display_filename = DirectoryReader(path, True).filename_for(None)
-        source = TextReader(text, display_filename)
+        return TextReader(text, display_filename)
     elif path == '-':
-        source = StdinReader()
+        return StdinReader()
     else:
-        source = DirectoryReader(path)
-
-    # Customize the renderer
-    if render_offline:
-        renderer = GripperRenderer(user_content, context)
-    elif user_content or context or api_url:
-        renderer = GitHubRenderer(user_content, context, api_url)
-    else:
-        renderer = None
-
-    # Optional basic auth
-    auth = (username, password) if username or password else None
-
-    # Create the customized app with default asset manager
-    return grip_class(source, auth, renderer, None, render_wide,
-                      render_inline, title, autorefresh, quiet, theme)
+        return DirectoryReader(path)
 
 
-def serve(path=None, host=None, port=None, user_content=False, context=None,
-          username=None, password=None, render_offline=False,
-          render_wide=False, render_inline=False, api_url=None, title=None,
-          autorefresh=True, browser=False, quiet=None, theme='light', grip_class=None):
-    """
-    Starts a server to render the specified file or directory containing
-    a README.
-    """
-    app = create_app(path, user_content, context, username, password,
-                     render_offline, render_wide, render_inline, api_url,
-                     title, None, autorefresh, quiet, theme, grip_class)
-    app.run(host, port, open_browser=browser)
+def _make_cache():
+    """Create an AssetCache with the default cache path."""
+    griphome = os.path.expanduser(
+        os.environ.get('GRIPHOME', DEFAULT_GRIPHOME))
+    cache_dir = CACHE_DIRECTORY.format(version=__version__)
+    cache_path = os.path.join(griphome, cache_dir)
+    return AssetCache(cache_path)
 
 
-def clear_cache(grip_class=None):
-    """
-    Clears the cached styles and assets.
-    """
-    if grip_class is None:
-        grip_class = Grip
-    grip_class(StdinReader()).clear_cache()
+def serve(path=None, host=None, port=None, user_content=False,
+          wide=False, title=None, autorefresh=True,
+          browser=False, quiet=None, theme='light'):
+    """Start the preview server."""
+    reader = _make_reader(path)
+    assets = _make_cache()
+    config = _resolve_config(
+        host, port, autorefresh, quiet, theme, title, user_content, wide)
+
+    assets.ensure_cached(quiet=config['quiet'])
+
+    address = (config['host'], config['port'])
+    server = GripServer(address, reader, assets, config)
+
+    if not config['quiet']:
+        print(' * Serving on http://{0}:{1}/'.format(*address),
+              file=sys.stderr)
+
+    browser_thread = None
+    if browser:
+        browser_thread = start_browser_when_ready(
+            config['host'], config['port'], server.shutdown_event)
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if not config['quiet']:
+            print(' * Shutting down...', file=sys.stderr)
+        server.shutdown_event.set()
+        server.server_close()
+        if browser_thread:
+            browser_thread.join(timeout=1)
 
 
-def render_page(path=None, user_content=False, context=None,
-                username=None, password=None,
-                render_offline=False, render_wide=False, render_inline=False,
-                api_url=None, title=None, text=None, quiet=None, theme='light',
-                grip_class=None):
-    """
-    Renders the specified markup text to an HTML page and returns it.
-    """
-    return create_app(path, user_content, context, username, password,
-                      render_offline, render_wide, render_inline, api_url,
-                      title, text, False, quiet, theme, grip_class).render()
+def export(path=None, user_content=False, wide=False,
+           render_inline=True, out_filename=None, title=None,
+           quiet=False, theme='light'):
+    """Export rendered markdown to an HTML file."""
+    reader = _make_reader(path)
+    assets = _make_cache()
+    assets.ensure_cached(quiet=quiet)
 
-
-def render_content(text, user_content=False, context=None, username=None,
-                   password=None, render_offline=False, api_url=None):
-    """
-    Renders the specified markup and returns the result.
-    """
-    renderer = (GitHubRenderer(user_content, context, api_url)
-                if not render_offline else
-                GripperRenderer(user_content, context))
-    auth = (username, password) if username or password else None
-    return renderer.render(text, auth)
-
-
-def export(path=None, user_content=False, context=None,
-           username=None, password=None, render_offline=False,
-           render_wide=False, render_inline=True, out_filename=None,
-           api_url=None, title=None, quiet=False, theme='light', grip_class=None):
-    """
-    Exports the rendered HTML to a file.
-    """
     export_to_stdout = out_filename == '-'
     if out_filename is None:
         if path == '-':
             export_to_stdout = True
         else:
             filetitle, _ = os.path.splitext(
-                os.path.relpath(DirectoryReader(path).root_filename))
+                os.path.relpath(reader.root_filename))
             out_filename = '{0}.html'.format(filetitle)
 
     if not export_to_stdout and not quiet:
         print('Exporting to', out_filename, file=sys.stderr)
 
-    page = render_page(path, user_content, context, username, password,
-                       render_offline, render_wide, render_inline, api_url,
-                       title, None, quiet, theme, grip_class)
+    out = '-' if export_to_stdout else out_filename
+    export_page(reader, None, assets, out_file=out, inline=render_inline,
+                title=title, theme=theme, user_content=user_content,
+                wide=wide, quiet=quiet)
 
-    if export_to_stdout:
-        try:
-            print(page)
-        except IOError as ex:
-            if ex.errno != 0 and ex.errno != errno.EPIPE:
-                raise
-    else:
-        with io.open(out_filename, 'w', encoding='utf-8') as f:
-            f.write(page)
+
+def clear_cache():
+    """Clear the cached assets."""
+    assets = _make_cache()
+    assets.clear()
+    print('Cache cleared.')
