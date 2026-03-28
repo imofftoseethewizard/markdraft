@@ -24,6 +24,7 @@ class ReadmeReader(object, metaclass=ABCMeta):
     """
     Reads Readme content from a URL subpath.
     """
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -56,8 +57,8 @@ class DirectoryReader(ReadmeReader):
     """
     Reads Readme files from URL subpaths.
     """
-    def __init__(self, path: str | None = None,
-                 silent: bool = False) -> None:
+
+    def __init__(self, path: str | None = None, silent: bool = False) -> None:
         super().__init__()
         root_filename = os.path.abspath(self._resolve_readme(path, silent))
         self.root_filename = root_filename
@@ -72,23 +73,22 @@ class DirectoryReader(ReadmeReader):
             return os.path.join(path, DEFAULT_FILENAME)
         raise ReadmeNotFoundError(path)
 
-    def _resolve_readme(self, path: str | None = None,
-                        silent: bool = False) -> str:
+    def _resolve_readme(self, path: str | None = None, silent: bool = False) -> str:
         if path is None:
-            path = '.'
+            path = "."
         path = os.path.normpath(path)
         if os.path.isdir(path):
             return self._find_file(path, silent)
         if silent or os.path.exists(path):
             return path
-        raise ReadmeNotFoundError(path, 'File not found: ' + path)
+        raise ReadmeNotFoundError(path, "File not found: " + path)
 
     def _read_text(self, filename: str) -> str:
-        with io.open(filename, 'rt', encoding='utf-8') as f:
+        with io.open(filename, "rt", encoding="utf-8") as f:
             return f.read()
 
     def _read_binary(self, filename: str) -> bytes:
-        with io.open(filename, 'rb') as f:
+        with io.open(filename, "rb") as f:
             return f.read()
 
     def normalize_subpath(self, subpath: str | None) -> str | None:
@@ -97,7 +97,7 @@ class DirectoryReader(ReadmeReader):
         subpath = posixpath.normpath(subpath)
         filename = os.path.normpath(_safe_join(self.root_directory, subpath))
         if os.path.isdir(filename):
-            subpath += '/'
+            subpath += "/"
         return subpath
 
     def readme_for(self, subpath: str | None) -> str:
@@ -119,7 +119,7 @@ class DirectoryReader(ReadmeReader):
 
     def is_binary(self, subpath: str | None = None) -> bool:
         mimetype = self.mimetype_for(subpath)
-        return bool(mimetype and not mimetype.startswith('text/'))
+        return bool(mimetype and not mimetype.startswith("text/"))
 
     def last_updated(self, subpath: str | None = None) -> float | None:
         try:
@@ -148,8 +148,8 @@ class TextReader(ReadmeReader):
     """
     Reads Readme content from the provided string.
     """
-    def __init__(self, text: str,
-                 display_filename: str | None = None) -> None:
+
+    def __init__(self, text: str, display_filename: str | None = None) -> None:
         super().__init__()
         self.text = text
         self.display_filename = display_filename
@@ -169,8 +169,9 @@ class StdinReader(TextReader):
     """
     Reads Readme text from STDIN.
     """
+
     def __init__(self, display_filename: str | None = None) -> None:
-        super().__init__('', display_filename)
+        super().__init__("", display_filename)
 
     def read(self, subpath: str | None = None) -> str:
         if not self.text and subpath is None:

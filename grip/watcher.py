@@ -12,8 +12,9 @@ from .readers import ReadmeReader
 class FileWatcher:
     """Polls a reader for file changes."""
 
-    def __init__(self, reader: ReadmeReader, subpath: str | None = None,
-                 interval: float = 0.3) -> None:
+    def __init__(
+        self, reader: ReadmeReader, subpath: str | None = None, interval: float = 0.3
+    ) -> None:
         self.reader = reader
         self.subpath = subpath
         self.interval = interval

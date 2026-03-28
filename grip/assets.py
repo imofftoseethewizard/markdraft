@@ -34,13 +34,18 @@ class AssetCache:
             if self.is_cached(filename):
                 continue
             if not quiet:
-                print(' * Downloading', filename, file=sys.stderr)
+                print(" * Downloading", filename, file=sys.stderr)
             try:
                 urllib.request.urlretrieve(url, self.get_path(filename))
             except Exception as ex:
                 if not quiet:
-                    print(' * Warning: failed to download', filename,
-                          '-', ex, file=sys.stderr)
+                    print(
+                        " * Warning: failed to download",
+                        filename,
+                        "-",
+                        ex,
+                        file=sys.stderr,
+                    )
 
     def clear(self) -> None:
         """Remove the cache directory."""

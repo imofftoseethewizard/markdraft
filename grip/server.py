@@ -20,13 +20,12 @@ from .exceptions import ReadmeNotFoundError
 from .readers import ReadmeReader
 from .watcher import FileWatcher
 
-
 # Ensure common font types are registered
-mimetypes.add_type('application/x-font-woff', '.woff')
-mimetypes.add_type('application/octet-stream', '.ttf')
-mimetypes.add_type('application/javascript', '.js')
+mimetypes.add_type("application/x-font-woff", ".woff")
+mimetypes.add_type("application/octet-stream", ".ttf")
+mimetypes.add_type("application/javascript", ".js")
 
-STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
 # Page body variants for template.html
 README_BODY = """\
@@ -83,8 +82,13 @@ class GripServer(ThreadingHTTPServer):
 
     daemon_threads = True
 
-    def __init__(self, address: tuple[str, int], reader: ReadmeReader,
-                 assets: AssetCache, config: dict[str, Any]) -> None:
+    def __init__(
+        self,
+        address: tuple[str, int],
+        reader: ReadmeReader,
+        assets: AssetCache,
+        config: dict[str, Any],
+    ) -> None:
         self.reader = reader
         self.assets = assets
         self.grip_config = config
@@ -94,54 +98,58 @@ class GripServer(ThreadingHTTPServer):
 
     def get_template(self) -> str:
         if self._template is None:
-            path = os.path.join(STATIC_DIR, 'template.html')
-            with open(path, 'r', encoding='utf-8') as f:
+            path = os.path.join(STATIC_DIR, "template.html")
+            with open(path, "r", encoding="utf-8") as f:
                 self._template = f.read()
         return self._template
 
     def build_page(self, subpath: str | None = None) -> str:
         """Build the HTML shell for a markdown page."""
         cfg = self.grip_config
-        filename = self.reader.filename_for(subpath) or ''
-        title = cfg.get('title') or filename
+        filename = self.reader.filename_for(subpath) or ""
+        title = cfg.get("title") or filename
         display_title = html.escape(title or filename)
-        page_title = html.escape(title) if cfg.get('title') else (
-            html.escape(filename) + ' - Grip' if filename else 'Grip')
+        page_title = (
+            html.escape(title)
+            if cfg.get("title")
+            else (html.escape(filename) + " - Grip" if filename else "Grip")
+        )
 
-        theme = cfg.get('theme', 'light')
-        data_color_mode = 'dark' if theme == 'dark' else 'light'
-        highlight_css = ('github-highlight-dark.min.css'
-                         if theme == 'dark' else
-                         'github-highlight.min.css')
+        theme = cfg.get("theme", "light")
+        data_color_mode = "dark" if theme == "dark" else "light"
+        highlight_css = (
+            "github-highlight-dark.min.css"
+            if theme == "dark"
+            else "github-highlight.min.css"
+        )
 
-        static_url = cfg.get('grip_url', '/__') + '/static'
-        content_path = cfg.get('grip_url', '/__') + '/api/content'
+        static_url = cfg.get("grip_url", "/__") + "/static"
+        content_path = cfg.get("grip_url", "/__") + "/api/content"
         if subpath:
-            content_path += '/' + subpath
+            content_path += "/" + subpath
 
-        refresh_url = ''
-        if cfg.get('autorefresh', True):
-            refresh_url = cfg.get('grip_url', '/__') + '/api/refresh'
+        refresh_url = ""
+        if cfg.get("autorefresh", True):
+            refresh_url = cfg.get("grip_url", "/__") + "/api/refresh"
             if subpath:
-                refresh_url += '/' + subpath
+                refresh_url += "/" + subpath
 
-        if cfg.get('user_content'):
-            comment_header = ''
+        if cfg.get("user_content"):
+            comment_header = ""
             if display_title:
                 comment_header = COMMENT_HEADER.format(title=display_title)
-            page_body = USER_CONTENT_BODY.format(
-                comment_header=comment_header)
+            page_body = USER_CONTENT_BODY.format(comment_header=comment_header)
         else:
-            box_header = ''
+            box_header = ""
             if display_title:
                 box_header = BOX_HEADER.format(display_title=display_title)
             page_body = README_BODY.format(box_header=box_header)
 
         return self.get_template().format(
             title=page_title,
-            favicon_url=static_url + '/favicon.ico',
+            favicon_url=static_url + "/favicon.ico",
             static_url=static_url,
-            highlight_css_url=static_url + '/' + highlight_css,
+            highlight_css_url=static_url + "/" + highlight_css,
             content_url=content_path,
             refresh_url=refresh_url,
             data_color_mode=data_color_mode,
@@ -156,19 +164,19 @@ class GripHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = urlparse(self.path).path
-        grip_url: str = self.server.grip_config.get('grip_url', '/__')
+        grip_url: str = self.server.grip_config.get("grip_url", "/__")
 
-        if path.startswith(grip_url + '/api/content'):
+        if path.startswith(grip_url + "/api/content"):
             self._handle_api_content(path, grip_url)
-        elif path.startswith(grip_url + '/api/refresh'):
+        elif path.startswith(grip_url + "/api/refresh"):
             self._handle_api_refresh(path, grip_url)
-        elif path.startswith(grip_url + '/static/'):
+        elif path.startswith(grip_url + "/static/"):
             self._handle_static(path, grip_url)
         else:
             self._handle_page(path)
 
     def _handle_page(self, path: str) -> None:
-        subpath = path.lstrip('/') or None
+        subpath = path.lstrip("/") or None
 
         try:
             normalized = self.server.reader.normalize_subpath(subpath)
@@ -177,7 +185,7 @@ class GripHandler(BaseHTTPRequestHandler):
             return
 
         if normalized != subpath:
-            self._send_redirect('/' + (normalized or ''))
+            self._send_redirect("/" + (normalized or ""))
             return
 
         # Binary files
@@ -187,8 +195,10 @@ class GripHandler(BaseHTTPRequestHandler):
             except ReadmeNotFoundError:
                 self._send_error(404)
                 return
-            data = raw if isinstance(raw, bytes) else raw.encode('utf-8')
-            mimetype = self.server.reader.mimetype_for(subpath) or 'application/octet-stream'
+            data = raw if isinstance(raw, bytes) else raw.encode("utf-8")
+            mimetype = (
+                self.server.reader.mimetype_for(subpath) or "application/octet-stream"
+            )
             self._send_bytes(200, data, mimetype)
             return
 
@@ -200,29 +210,29 @@ class GripHandler(BaseHTTPRequestHandler):
             return
 
         page = self.server.build_page(subpath)
-        self._send_text(200, page, 'text/html; charset=utf-8')
+        self._send_text(200, page, "text/html; charset=utf-8")
 
     def _handle_api_content(self, path: str, grip_url: str) -> None:
-        subpath = self._extract_subpath(path, grip_url + '/api/content')
+        subpath = self._extract_subpath(path, grip_url + "/api/content")
         try:
             text = self.server.reader.read(subpath)
-            filename = self.server.reader.filename_for(subpath) or ''
+            filename = self.server.reader.filename_for(subpath) or ""
         except ReadmeNotFoundError:
             self._send_error(404)
             return
-        body = json.dumps({'text': text, 'filename': filename})
-        self._send_text(200, body, 'application/json; charset=utf-8')
+        body = json.dumps({"text": text, "filename": filename})
+        self._send_text(200, body, "application/json; charset=utf-8")
 
     def _handle_api_refresh(self, path: str, grip_url: str) -> None:
-        if not self.server.grip_config.get('autorefresh', True):
+        if not self.server.grip_config.get("autorefresh", True):
             self._send_error(404)
             return
-        subpath = self._extract_subpath(path, grip_url + '/api/refresh')
+        subpath = self._extract_subpath(path, grip_url + "/api/refresh")
 
         self.send_response(200)
-        self.send_header('Content-Type', 'text/event-stream')
-        self.send_header('Cache-Control', 'no-cache')
-        self.send_header('Connection', 'keep-alive')
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
         self.end_headers()
 
         watcher = FileWatcher(self.server.reader, subpath)
@@ -230,17 +240,16 @@ class GripHandler(BaseHTTPRequestHandler):
             for _ in watcher.watch(self.server.shutdown_event):
                 self.wfile.write(b'data: {"updated": true}\r\n\r\n')
                 self.wfile.flush()
-                if not self.server.grip_config.get('quiet'):
-                    filename = self.server.reader.filename_for(subpath) or 'file'
-                    print(' * Change detected in {0}, refreshing'.format(
-                        filename))
+                if not self.server.grip_config.get("quiet"):
+                    filename = self.server.reader.filename_for(subpath) or "file"
+                    print(" * Change detected in {0}, refreshing".format(filename))
         except (BrokenPipeError, ConnectionResetError):
             pass
 
     def _handle_static(self, path: str, grip_url: str) -> None:
-        prefix = grip_url + '/static/'
-        filename = path[len(prefix):]
-        if not filename or '..' in filename:
+        prefix = grip_url + "/static/"
+        filename = path[len(prefix) :]
+        if not filename or ".." in filename:
             self._send_error(404)
             return
 
@@ -261,36 +270,36 @@ class GripHandler(BaseHTTPRequestHandler):
     def _serve_file(self, filepath: str) -> None:
         mimetype, _ = mimetypes.guess_type(filepath)
         if mimetype is None:
-            mimetype = 'application/octet-stream'
-        with open(filepath, 'rb') as f:
+            mimetype = "application/octet-stream"
+        with open(filepath, "rb") as f:
             data = f.read()
         self._send_bytes(200, data, mimetype)
 
     def _extract_subpath(self, path: str, prefix: str) -> str | None:
-        sub = path[len(prefix):].strip('/')
+        sub = path[len(prefix) :].strip("/")
         return sub or None
 
     def _send_text(self, code: int, text: str, content_type: str) -> None:
-        self._send_bytes(code, text.encode('utf-8'), content_type)
+        self._send_bytes(code, text.encode("utf-8"), content_type)
 
     def _send_bytes(self, code: int, data: bytes, content_type: str) -> None:
         self.send_response(code)
-        self.send_header('Content-Type', content_type)
-        self.send_header('Content-Length', str(len(data)))
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
 
     def _send_redirect(self, location: str) -> None:
         self.send_response(302)
-        self.send_header('Location', location)
+        self.send_header("Location", location)
         self.end_headers()
 
     def _send_error(self, code: int) -> None:
         self.send_response(code)
-        self.send_header('Content-Type', 'text/plain')
+        self.send_header("Content-Type", "text/plain")
         self.end_headers()
         self.wfile.write(str(code).encode())
 
     def log_message(self, format: str, *args: Any) -> None:
-        if not self.server.grip_config.get('quiet'):
+        if not self.server.grip_config.get("quiet"):
             super().log_message(format, *args)
