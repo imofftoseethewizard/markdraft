@@ -17,6 +17,7 @@ dev = [
     "flake8>=7",
     "pyright>=1.1.408",
     "black>=26.3.1",
+    "pytest-xdist>=3.8.0",
 ]
 
 [build-system]
@@ -28,6 +29,7 @@ packages = ["markdraft"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-n auto"
 norecursedirs = ["venv", "site-packages", ".research", ".venv"]
 markers = [
     "assumption: mark a test as an external assumption.",
