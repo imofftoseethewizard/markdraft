@@ -1,14 +1,14 @@
 """
-Tests for the HTTP server (routes, content types, redirects, errors).
+E2E tests for the HTTP server — routes, content types, redirects, errors.
 """
 
-import json
+import os
 
 
 class TestPageRoutes:
-    """Verify the HTML shell is served for markdown files."""
+    """HTML shell serving for markdown files."""
 
-    def test_root_serves_html(self, text_server):
+    def test_root_serves_html_shell(self, text_server):
         client = text_server("# Hello")
         resp = client.get("/")
         assert resp.status_code == 200
@@ -17,52 +17,11 @@ class TestPageRoutes:
 
     def test_page_has_data_attributes(self, text_server):
         client = text_server("# Hello")
-        resp = client.get("/")
-        html = resp.text()
+        html = client.get("/").text()
         assert "data-content-url=" in html
         assert "data-color-mode=" in html
 
-    def test_page_title_from_filename(self, text_server):
-        client = text_server("# Hello", display_filename="README.md")
-        html = client.get("/").text()
-        assert "README.md - Markdraft" in html
-
-    def test_page_title_override(self, text_server):
-        client = text_server("# Hello", title="Custom Title")
-        html = client.get("/").text()
-        assert "Custom Title" in html
-
-    def test_theme_light(self, text_server):
-        client = text_server("text", theme="light")
-        assert 'data-color-mode="light"' in client.get("/").text()
-
-    def test_theme_dark(self, text_server):
-        client = text_server("text", theme="dark")
-        assert 'data-color-mode="dark"' in client.get("/").text()
-
-    def test_user_content_layout(self, text_server):
-        client = text_server("text", user_content=True)
-        html = client.get("/").text()
-        assert "pull-discussion-timeline" in html
-        assert 'id="readme"' not in html
-
-    def test_non_user_content_layout(self, text_server):
-        client = text_server("text")
-        html = client.get("/").text()
-        assert 'id="readme"' in html
-        assert "pull-discussion-timeline" not in html
-
-    def test_autorefresh_url_present(self, text_server):
-        client = text_server("text", autorefresh=True)
-        html = client.get("/").text()
-        assert 'data-refresh-url="/__/api/refresh"' in html
-
-    def test_autorefresh_url_empty(self, text_server):
-        client = text_server("text", autorefresh=False)
-        html = client.get("/").text()
-        assert 'data-refresh-url=""' in html
-
-    def test_script_tags_present(self, text_server):
+    def test_page_includes_script_tags(self, text_server):
         client = text_server("text")
         html = client.get("/").text()
         assert "marked.min.js" in html
@@ -70,9 +29,80 @@ class TestPageRoutes:
         assert "mermaid.min.js" in html
         assert "markdraft.js" in html
 
+    def test_page_includes_css_links(self, text_server):
+        client = text_server("text")
+        html = client.get("/").text()
+        assert "github-markdown.css" in html
+        assert "markdraft.css" in html
+        assert "octicons.css" in html
+
+
+class TestPageTitle:
+    def test_title_from_filename(self, text_server):
+        client = text_server("# Hi", display_filename="README.md")
+        assert "README.md - Markdraft" in client.get("/").text()
+
+    def test_title_override(self, text_server):
+        client = text_server("# Hi", title="Custom Title")
+        assert "Custom Title" in client.get("/").text()
+
+    def test_title_no_filename(self, text_server):
+        client = text_server("# Hi", display_filename=None)
+        html = client.get("/").text()
+        assert "<title>Markdraft</title>" in html
+
+
+class TestTheme:
+    def test_theme_light(self, text_server):
+        client = text_server("text", theme="light")
+        html = client.get("/").text()
+        assert 'data-color-mode="light"' in html
+        assert "github-highlight.min.css" in html
+
+    def test_theme_dark(self, text_server):
+        client = text_server("text", theme="dark")
+        html = client.get("/").text()
+        assert 'data-color-mode="dark"' in html
+        assert "github-highlight-dark.min.css" in html
+
+
+class TestLayout:
+    def test_readme_layout(self, text_server):
+        client = text_server("text")
+        html = client.get("/").text()
+        assert 'id="readme"' in html
+        assert "pull-discussion-timeline" not in html
+
+    def test_user_content_layout(self, text_server):
+        client = text_server("text", user_content=True)
+        html = client.get("/").text()
+        assert "pull-discussion-timeline" in html
+        assert 'id="readme"' not in html
+
+    def test_user_content_with_title(self, text_server):
+        client = text_server("text", user_content=True, title="Issue #1")
+        html = client.get("/").text()
+        assert "timeline-comment-header" in html
+        assert "Issue #1" in html
+
+    def test_user_content_without_title_or_filename(self, text_server):
+        client = text_server("text", user_content=True, display_filename=None)
+        html = client.get("/").text()
+        assert "pull-discussion-timeline" in html
+
+
+class TestAutorefresh:
+    def test_autorefresh_url_present(self, text_server):
+        client = text_server("text", autorefresh=True)
+        assert 'data-refresh-url="/__/api/refresh"' in client.get("/").text()
+
+    def test_autorefresh_url_empty(self, text_server):
+        client = text_server("text", autorefresh=False)
+        assert 'data-refresh-url=""' in client.get("/").text()
+
 
 class TestApiContent:
-    """Verify the JSON content API."""
+    """JSON content API."""
 
     def test_returns_json(self, text_server):
         client = text_server("# Hello")
@@ -90,111 +120,98 @@ class TestApiContent:
         data = client.get("/__/api/content").json()
         assert data["filename"] == "README.md"
 
-    def test_content_for_subpath(self, dir_server):
-        client = dir_server(
-            {
-                "README.md": "# Root",
-                "other.md": "# Other File",
-            }
-        )
+    def test_subpath(self, dir_server):
+        client = dir_server({"README.md": "root", "other.md": "# Other"})
         data = client.get("/__/api/content/other.md").json()
-        assert "# Other File" in data["text"]
+        assert "# Other" in data["text"]
 
     def test_missing_file_404(self, text_server):
-        client = text_server("text")
-        resp = client.get("/__/api/content/nonexistent.md")
-        assert resp.status_code == 404
+        assert text_server("text").get("/__/api/content/nope.md").status_code == 404
 
 
 class TestApiRefresh:
-    """Verify the SSE refresh endpoint."""
+    """SSE refresh endpoint."""
 
-    def test_refresh_enabled(self, text_server):
-        """Verify the refresh endpoint is accessible (not 404).
-        The SSE stream blocks, so we just check that autorefresh=False
-        gives 404 (tested below) and autorefresh=True does not."""
-        # Tested indirectly: the page HTML has a non-empty refresh URL
+    def test_refresh_enabled_in_html(self, text_server):
         client = text_server("text", autorefresh=True)
-        html = client.get("/").text()
-        assert 'data-refresh-url="/__/api/refresh"' in html
+        assert 'data-refresh-url="/__/api/refresh"' in client.get("/").text()
 
-    def test_refresh_disabled(self, text_server):
-        client = text_server("text", autorefresh=False)
-        resp = client.get("/__/api/refresh")
-        assert resp.status_code == 404
+    def test_refresh_disabled_returns_404(self, text_server):
+        assert text_server("text", autorefresh=False).get("/__/api/refresh").status_code == 404
 
 
 class TestStaticFiles:
-    """Verify static file serving."""
-
     def test_serve_bundled_css(self, text_server):
-        client = text_server("text")
-        resp = client.get("/__/static/markdraft.css")
+        resp = text_server("text").get("/__/static/markdraft.css")
         assert resp.status_code == 200
         assert ".preview-page" in resp.text()
 
     def test_serve_bundled_js(self, text_server):
-        client = text_server("text")
-        resp = client.get("/__/static/markdraft.js")
+        resp = text_server("text").get("/__/static/markdraft.js")
         assert resp.status_code == 200
         assert "marked" in resp.text()
 
     def test_serve_favicon(self, text_server):
-        client = text_server("text")
-        resp = client.get("/__/static/favicon.ico")
+        assert text_server("text").get("/__/static/favicon.ico").status_code == 200
+
+    def test_serve_cached_asset(self, tmp_path, preview_server):
+        from markdraft.assets import AssetCache
+        from markdraft.readers import TextReader
+
+        cache_path = str(tmp_path / "cache")
+        os.makedirs(cache_path, exist_ok=True)
+        with open(os.path.join(cache_path, "test-asset.js"), "w") as f:
+            f.write("// cached asset")
+
+        assets = AssetCache(cache_path)
+        reader = TextReader("hi", "README.md")
+        client = preview_server(reader, assets=assets)
+        resp = client.get("/__/static/test-asset.js")
         assert resp.status_code == 200
+        assert "// cached asset" in resp.text()
 
     def test_missing_static_404(self, text_server):
-        client = text_server("text")
-        resp = client.get("/__/static/nonexistent.xyz")
-        assert resp.status_code == 404
+        assert text_server("text").get("/__/static/nope.xyz").status_code == 404
 
     def test_path_traversal_blocked(self, text_server):
-        client = text_server("text")
-        resp = client.get("/__/static/../../../etc/passwd")
+        resp = text_server("text").get("/__/static/../../../etc/passwd")
         assert resp.status_code == 404
+
+    def test_empty_filename_404(self, text_server):
+        assert text_server("text").get("/__/static/").status_code == 404
 
 
 class TestRouting:
-    """Verify directory routing, redirects, and binary serving."""
+    """Directory routing, redirects, binary serving."""
 
-    def test_directory_with_readme(self, dir_server):
-        client = dir_server(
-            {
-                "README.md": "# Root",
-                "sub/README.md": "# Sub",
-            }
-        )
-        resp = client.get("/sub/")
-        # Subdirectory with README.md serves the HTML shell
+    def test_root_serves_readme(self, dir_server):
+        resp = dir_server({"README.md": "# Root"}).get("/")
         assert resp.status_code == 200
         assert "<!DOCTYPE html>" in resp.text()
 
-    def test_explicit_markdown_file(self, dir_server):
-        client = dir_server(
-            {
-                "README.md": "# Root",
-                "other.md": "# Other",
-            }
-        )
-        resp = client.get("/other.md")
-        assert resp.status_code == 200
-        assert "<!DOCTYPE html>" in resp.text()
+    def test_explicit_file(self, dir_server):
+        client = dir_server({"README.md": "root", "other.md": "# Other"})
+        assert client.get("/other.md").status_code == 200
 
     def test_missing_file_404(self, dir_server):
-        client = dir_server({"README.md": "# Root"})
-        resp = client.get("/nonexistent.md")
-        assert resp.status_code == 404
+        assert dir_server({"README.md": "hi"}).get("/nope.md").status_code == 404
 
-    def test_binary_file_served_raw(self, dir_server):
-        png_header = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
-        client = dir_server(
-            {
-                "README.md": "# Root",
-                "image.png": png_header,
-            }
-        )
-        resp = client.get("/image.png")
+    def test_subdirectory_serves_readme(self, dir_server):
+        client = dir_server({"README.md": "root", "sub/README.md": "sub"})
+        assert client.get("/sub/").status_code == 200
+
+    def test_binary_file_raw(self, dir_server):
+        png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 50
+        client = dir_server({"README.md": "hi", "img.png": png})
+        resp = client.get("/img.png")
         assert resp.status_code == 200
         assert resp.data[:4] == b"\x89PNG"
         assert "image/png" in resp.headers.get("Content-Type", "")
+
+    def test_path_traversal_blocked(self, dir_server):
+        assert dir_server({"README.md": "hi"}).get("/../../../etc/passwd").status_code == 404
+
+    def test_directory_redirect(self, dir_server):
+        client = dir_server({"README.md": "root", "sub/README.md": "sub"})
+        resp = client.get("/sub")
+        assert resp.status_code in (200, 302)

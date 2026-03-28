@@ -1,7 +1,8 @@
+import json
 import os
 import sys
 import threading
-import time
+import urllib.error
 import urllib.request
 
 DIRNAME = os.path.dirname(os.path.abspath(__file__))
@@ -20,7 +21,7 @@ class TestClient:
     def __init__(self, host, port):
         self.base_url = "http://{0}:{1}".format(host, port)
 
-    def get(self, path, follow_redirects=False):
+    def get(self, path):
         url = self.base_url + path
         req = urllib.request.Request(url)
         try:
@@ -41,8 +42,6 @@ class _Response:
         return self.data.decode("utf-8", errors="replace")
 
     def json(self):
-        import json
-
         return json.loads(self.data)
 
 
@@ -55,12 +54,13 @@ class MockAssetCache(AssetCache):
 
 @pytest.fixture
 def preview_server(tmp_path):
-    """Factory fixture that starts a PreviewServer on a random port."""
+    """Factory: preview_server(reader, assets=None, **config) → TestClient."""
     servers = []
 
-    def _make(reader, **config_overrides):
-        cache_path = str(tmp_path / "cache")
-        assets = MockAssetCache(cache_path)
+    def _make(reader, assets=None, **config_overrides):
+        if assets is None:
+            cache_path = str(tmp_path / "cache")
+            assets = MockAssetCache(cache_path)
         config = dict(
             autorefresh=True,
             quiet=True,
@@ -88,7 +88,7 @@ def preview_server(tmp_path):
 
 @pytest.fixture
 def text_server(tmp_path, preview_server):
-    """Factory: create a server serving in-memory text."""
+    """Factory: text_server(text, **config) → TestClient."""
 
     def _make(text, **kwargs):
         filename = kwargs.pop("display_filename", "README.md")
@@ -100,7 +100,7 @@ def text_server(tmp_path, preview_server):
 
 @pytest.fixture
 def dir_server(tmp_path, preview_server):
-    """Factory: create a server serving a temp directory."""
+    """Factory: dir_server(files_dict, **config) → TestClient."""
 
     def _make(files, **kwargs):
         content_dir = tmp_path / "content"
