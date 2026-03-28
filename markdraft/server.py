@@ -321,20 +321,28 @@ class PreviewHandler(BaseHTTPRequestHandler):
                 return
             self._send_error(404)
             return
-        # Include sibling listing for navigation
-        if subpath:
+        # Include sibling listing for navigation.
+        # If the subpath is a directory (serving its README), list
+        # that directory's contents. Otherwise list the parent.
+        if self.server.reader.is_directory(subpath):
+            nav_dir = subpath
+            nav_path = (subpath or "").rstrip("/")
+            nav_path = nav_path + "/" if nav_path else ""
+        elif subpath:
             parent = posixpath.dirname(subpath.rstrip("/"))
-            parent_path = parent + "/" if parent else ""
+            nav_dir = parent or None
+            nav_path = parent + "/" if parent else ""
         else:
-            parent_path = ""
-        siblings = self.server.reader.list_directory(parent_path.rstrip("/") or None)
+            nav_dir = None
+            nav_path = ""
+        siblings = self.server.reader.list_directory(nav_dir)
         body = json.dumps(
             {
                 "type": "file",
                 "text": text,
                 "filename": filename,
                 "path": subpath or "",
-                "parent": parent_path,
+                "parent": nav_path,
                 "siblings": siblings,
             }
         )
