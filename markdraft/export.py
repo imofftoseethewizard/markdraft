@@ -84,7 +84,20 @@ USER_CONTENT_BODY = """\
                     </div>
                   </div>"""
 
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+
+def _read_client_js() -> str:
+    """Read markdraft.js, supporting both filesystem and zipapp."""
+    path = os.path.join(os.path.dirname(__file__), "static", "markdraft.js")
+    if os.path.isfile(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    import importlib.resources
+
+    return (
+        importlib.resources.files("markdraft") / "static" / "markdraft.js"
+    ).read_text(
+        encoding="utf-8"
+    )  # type: ignore[union-attr]
 
 
 def export_page(
@@ -182,10 +195,7 @@ def export_page(
             '  <script src="{2}"></script>'
         ).format(cdn["marked.min.js"], cdn["highlight.min.js"], cdn["mermaid.min.js"])
 
-    # Read markdraft.js
-    client_js_path = os.path.join(STATIC_DIR, "markdraft.js")
-    with open(client_js_path, "r", encoding="utf-8") as f:
-        client_js = f.read()
+    client_js = _read_client_js()
 
     page = EXPORT_TEMPLATE.format(
         title=html.escape(page_title),

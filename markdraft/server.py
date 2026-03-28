@@ -25,7 +25,41 @@ mimetypes.add_type("application/x-font-woff", ".woff")
 mimetypes.add_type("application/octet-stream", ".ttf")
 mimetypes.add_type("application/javascript", ".js")
 
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+_STATIC_FILES = [
+    "favicon.ico",
+    "markdraft.css",
+    "markdraft.js",
+    "template.html",
+    "octicons/octicons.css",
+    "octicons/octicons.eot",
+    "octicons/octicons.svg",
+    "octicons/octicons.ttf",
+    "octicons/octicons.woff",
+    "octicons/octicons.woff2",
+]
+
+
+def _resolve_static_dir() -> str:
+    """Resolve the static directory, extracting from zip if needed."""
+    candidate = os.path.join(os.path.dirname(__file__), "static")
+    if os.path.isdir(candidate):
+        return candidate
+    # Running from a zipapp — extract static files to a temp directory
+    import importlib.resources
+    import tempfile
+
+    tmpdir = tempfile.mkdtemp(prefix="markdraft-static-")
+    pkg = importlib.resources.files("markdraft") / "static"
+    for relpath in _STATIC_FILES:
+        data = (pkg / relpath).read_bytes()  # type: ignore[union-attr]
+        dest = os.path.join(tmpdir, relpath)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        with open(dest, "wb") as f:
+            f.write(data)
+    return tmpdir
+
+
+STATIC_DIR = _resolve_static_dir()
 
 # Page body variants for template.html
 README_BODY = """\
