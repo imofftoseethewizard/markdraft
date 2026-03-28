@@ -9,22 +9,6 @@
 
   // --- Configure marked ---
 
-  marked.setOptions({
-    gfm: true,
-    breaks: false,
-    highlight: function (code, lang) {
-      if (lang && typeof hljs !== 'undefined' && hljs.getLanguage(lang)) {
-        try { return hljs.highlight(code, { language: lang }).value; }
-        catch (e) { /* fall through */ }
-      }
-      if (typeof hljs !== 'undefined') {
-        try { return hljs.highlightAuto(code).value; }
-        catch (e) { /* fall through */ }
-      }
-      return code;
-    }
-  });
-
   // Register marked-katex-extension for $inline$ and $$display$$ math.
   if (typeof markedKatex !== 'undefined') {
     marked.use(markedKatex.default
@@ -39,32 +23,47 @@
       : markedAlert());
   }
 
-  // Custom renderer for special code blocks.
-  var renderer = new marked.Renderer();
-  var origCode = renderer.code;
-  renderer.code = function (code, language, escaped) {
-    if (language === 'mermaid') {
-      return '<pre class="mermaid">' + escapeHtml(code) + '</pre>';
+  // Custom renderer for special code blocks and syntax highlighting.
+  // marked v15+ passes a single object {text, lang, escaped} to code().
+  marked.use({
+    renderer: {
+      code: function (args) {
+        var code = typeof args === 'string' ? args : args.text;
+        var language = typeof args === 'string' ? arguments[1] : args.lang;
+
+        if (language === 'mermaid') {
+          return '<pre class="mermaid">' + escapeHtml(code) + '</pre>';
+        }
+        if (language === 'geojson' || language === 'topojson') {
+          var mapId = 'markdraft-map-' + (idCounter++);
+          return '<div id="' + mapId + '" class="markdraft-map" data-geojson="' +
+            escapeHtml(code) + '"></div>';
+        }
+        if (language === 'stl') {
+          var stlId = 'markdraft-stl-' + (idCounter++);
+          return '<div id="' + stlId + '" class="markdraft-stl" data-stl="' +
+            escapeHtml(code) + '"></div>';
+        }
+
+        // Syntax highlighting
+        var highlighted = code;
+        if (language && typeof hljs !== 'undefined' && hljs.getLanguage(language)) {
+          try { highlighted = hljs.highlight(code, { language: language }).value; }
+          catch (e) { /* fall through */ }
+        } else if (typeof hljs !== 'undefined') {
+          try { highlighted = hljs.highlightAuto(code).value; }
+          catch (e) { /* fall through */ }
+        } else {
+          highlighted = escapeHtml(code);
+        }
+
+        if (language) {
+          return '<pre><code class="hljs language-' + escapeHtml(language) + '">' + highlighted + '</code></pre>';
+        }
+        return '<pre><code class="hljs">' + highlighted + '</code></pre>';
+      }
     }
-    if (language === 'geojson' || language === 'topojson') {
-      var mapId = 'markdraft-map-' + (idCounter++);
-      return '<div id="' + mapId + '" class="markdraft-map" data-geojson="' +
-        escapeHtml(code) + '"></div>';
-    }
-    if (language === 'stl') {
-      var stlId = 'markdraft-stl-' + (idCounter++);
-      return '<div id="' + stlId + '" class="markdraft-stl" data-stl="' +
-        escapeHtml(code) + '"></div>';
-    }
-    if (origCode) {
-      return origCode.call(this, code, language, escaped);
-    }
-    var esc = escapeHtml(code);
-    if (language) {
-      return '<pre><code class="hljs language-' + escapeHtml(language) + '">' + esc + '</code></pre>';
-    }
-    return '<pre><code>' + esc + '</code></pre>';
-  };
+  });
 
   function escapeHtml(s) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -178,7 +177,7 @@
 
   function renderMarkdown(text) {
     idCounter = 0;
-    var html = marked.parse(text, { renderer: renderer });
+    var html = marked.parse(text);
     document.getElementById('markdraft-content').innerHTML = html;
     initMermaid();
     initGeoJSON();
