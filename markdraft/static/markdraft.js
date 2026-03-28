@@ -177,14 +177,15 @@
 
   function buildBreadcrumb(fullPath) {
     var parts = fullPath.replace(/\/$/, '').split('/').filter(Boolean);
-    var html = '<a href="/">/</a>';
+    if (parts.length === 0) return '<a href="/">/</a>';
+    var crumbs = ['<a href="/">/</a>'];
     var accumulated = '';
     for (var i = 0; i < parts.length; i++) {
       accumulated += parts[i] + '/';
-      html += ' / <a href="/' + escapeHtml(accumulated) + '">'
-        + escapeHtml(parts[i]) + '</a>';
+      crumbs.push('<a href="/' + escapeHtml(accumulated) + '">'
+        + escapeHtml(parts[i]) + '</a>');
     }
-    return html;
+    return crumbs.join(' &rsaquo; ');
   }
 
   function buildSiblingNav(parentPath, entries, currentFile) {
