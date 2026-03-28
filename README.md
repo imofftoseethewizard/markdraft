@@ -1,7 +1,8 @@
 # Markdraft
 
-Preview local markdown files in the browser with mermaid diagram support,
-syntax highlighting, and live reload. Zero runtime dependencies.
+Preview local markdown files in the browser with GitHub-flavored
+rendering, mermaid diagrams, math, syntax highlighting, and live reload.
+Zero runtime dependencies.
 
 ```console
 $ draft README.md
@@ -10,6 +11,8 @@ $ draft README.md
 
 
 ## Installation
+
+### From PyPI
 
 ```console
 pip install markdraft
@@ -21,10 +24,19 @@ Or with [uv](https://docs.astral.sh/uv/):
 uv tool install markdraft
 ```
 
-Requires Python 3.10+. On first run, markdraft downloads ~3 MB of
-JavaScript libraries (marked.js, highlight.js, mermaid.js) from
-[jsDelivr](https://www.jsdelivr.com/) and caches them in
-`~/.markdraft/`.
+### Standalone executable
+
+Download `markdraft.pyz` from
+[Releases](https://github.com/imofftoseethewizard/markdraft/releases)
+and run it directly — no installation needed:
+
+```console
+python markdraft.pyz README.md
+```
+
+Requires Python 3.10+. On first run, markdraft downloads ~3.5 MB of
+JavaScript libraries from [jsDelivr](https://www.jsdelivr.com/) and
+caches them in `~/.markdraft/`.
 
 
 ## Usage
@@ -81,18 +93,24 @@ where `draft` conflicts with [Azure Draft](https://github.com/Azure/draft).
 
 - **Live reload** — file changes are detected and the browser refreshes
   automatically via Server-Sent Events
-- **Mermaid diagrams** — fenced code blocks with the `mermaid` language
-  tag are rendered as diagrams by [mermaid.js](https://mermaid.js.org/)
-- **Syntax highlighting** — code blocks are highlighted by
+- **Mermaid diagrams** — ` ```mermaid ` fenced code blocks rendered by
+  [mermaid.js](https://mermaid.js.org/)
+- **Math/LaTeX** — `$inline$` and `$$display$$` math rendered by
+  [KaTeX](https://katex.org/)
+- **Syntax highlighting** — code blocks highlighted by
   [highlight.js](https://highlightjs.org/)
+- **GitHub Alerts** — `> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`,
+  `> [!WARNING]`, `> [!CAUTION]` styled callout boxes
+- **Task lists** — `- [x]` and `- [ ]` checkboxes
 - **GitHub styling** — rendered with
   [github-markdown-css](https://github.com/sindresorhus/github-markdown-css)
-  for a familiar look
-- **Export** — produce a self-contained HTML file that renders in any
-  browser, with all assets inlined or linked via CDN
-- **Zero dependencies** — the Python package has no runtime dependencies;
-  rendering is done client-side by cached JavaScript libraries
+- **Export** — self-contained HTML files with all assets inlined or
+  linked via CDN
+- **Zero dependencies** — no pip runtime dependencies; rendering is
+  done client-side by cached JavaScript libraries
 - **Dark mode** — `--theme=dark` for dark color scheme
+- **Standalone executable** — download a single `.pyz` file, no
+  installation required
 
 
 ## CLI Reference
@@ -165,6 +183,7 @@ Browser                          Server (http.server)
   │  GET /__/api/content           │
   │───────────────────────────────>│ raw markdown as JSON
   │  [marked.js renders markdown]  │
+  │  [KaTeX renders math]          │
   │  [highlight.js highlights code]│
   │  [mermaid.js renders diagrams] │
   │  GET /__/api/refresh (SSE)     │
@@ -188,10 +207,10 @@ Modules:
 ## Development
 
 ```console
-git clone https://github.com/user/markdraft
+git clone https://github.com/imofftoseethewizard/markdraft
 cd markdraft
 uv sync
-uv run pytest              # 138 tests, ~7s parallel
+uv run pytest              # 148 tests, ~8s parallel
 uv run pyright markdraft/  # type checking
 uv run black markdraft/ tests/  # formatting
 ```
@@ -214,16 +233,23 @@ abstractions and CLI design informed markdraft's architecture.
   with [marked.js](https://github.com/markedjs/marked),
   [highlight.js](https://github.com/highlightjs/highlight.js), and
   [mermaid.js](https://github.com/mermaid-js/mermaid).
-- **Mermaid diagram support** — natively renders ` ```mermaid ` fenced
-  code blocks as diagrams.
-- **stdlib HTTP server** — replaces Flask with `http.server.ThreadingHTTPServer`.
-- **Modern Python** — requires Python 3.10+, uses type annotations
-  throughout, drops all Python 2 compatibility code.
-- **uv project management** — uses `pyproject.toml` with hatchling
-  build backend, managed by [uv](https://docs.astral.sh/uv/).
+- **Math/LaTeX support** — `$inline$` and `$$display$$` math via
+  [KaTeX](https://katex.org/).
+- **GitHub Alerts** — `> [!NOTE]`, `> [!WARNING]`, etc. rendered as
+  styled callout boxes.
+- **Mermaid diagram support** — ` ```mermaid ` fenced code blocks
+  rendered as diagrams.
+- **stdlib HTTP server** — replaces Flask with
+  `http.server.ThreadingHTTPServer`.
+- **Modern Python** — requires Python 3.10+, full type annotations,
+  no Python 2 compatibility code.
+- **uv project management** — `pyproject.toml` with hatchling build
+  backend, managed by [uv](https://docs.astral.sh/uv/).
 - **Security hardening** — path traversal protection via
   `Path.relative_to()`, symlink escape prevention, case-insensitive
   `</script>` escaping in exports.
+- **Standalone executable** — downloadable `.pyz` file, no installation
+  required.
 - **GitHub API removed** — Grip's primary mode was to POST markdown to
   the GitHub API for rendering. Markdraft renders entirely offline.
 
