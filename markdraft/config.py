@@ -51,7 +51,7 @@ CDN_ASSETS = {
     "leaflet.js": "https://cdn.jsdelivr.net/npm/leaflet@1/dist/leaflet.js",
     "leaflet.css": "https://cdn.jsdelivr.net/npm/leaflet@1/dist/leaflet.css",
     # STL 3D model rendering
-    "three.min.js": "https://cdn.jsdelivr.net/npm/three@0.170/build/three.min.js",
+    "three.min.js": "https://cdn.jsdelivr.net/npm/three@0.160/build/three.min.js",
 }
 
 # KaTeX CSS is loaded from CDN directly (references relative font URLs
