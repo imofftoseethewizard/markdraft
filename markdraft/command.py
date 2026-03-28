@@ -13,7 +13,7 @@ from .exceptions import ReadmeNotFoundError
 
 version = "Markdraft " + __version__
 
-VALID_THEME_OPTIONS = ["light", "dark"]
+VALID_THEME_OPTIONS = ["light", "dark", "auto"]
 
 
 def _split_address(address: str | None) -> tuple[str | None, int | None]:
@@ -110,10 +110,10 @@ def main(argv=None):
         if args.theme in VALID_THEME_OPTIONS:
             theme = args.theme
         else:
-            print('Error: valid options for theme argument are "light", "dark"')
+            print('Error: valid options for theme are "auto", "light", "dark"')
             return 1
     else:
-        theme = "light"
+        theme = "auto"
 
     # Export
     if args.export:

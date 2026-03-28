@@ -112,7 +112,8 @@ where `draft` conflicts with [Azure Draft](https://github.com/Azure/draft).
   linked via CDN
 - **Zero dependencies** — no pip runtime dependencies; rendering is
   done client-side by cached JavaScript libraries
-- **Dark mode** — `--theme=dark` for dark color scheme
+- **Auto/dark/light mode** — follows OS preference by default
+  (`--theme=auto`), or force with `--theme=dark` / `--theme=light`
 - **Standalone executable** — download a single `.pyz` file, no
   installation required
 
@@ -318,7 +319,7 @@ usage: draft [-h] [-V] [--user-content] [--wide] [--clear] [--export]
 | `--export` | Export to HTML file instead of serving |
 | `--no-inline` | Use CDN links instead of inlining assets in export |
 | `--title TITLE` | Override the page title |
-| `--theme THEME` | Color theme: `light` (default) or `dark` |
+| `--theme THEME` | Color theme: `auto` (default), `light`, or `dark` |
 | `--user-content` | Render as GitHub issue/comment style |
 | `--wide` | Wide layout (with `--user-content`) |
 | `--norefresh` | Disable auto-refresh on file change |

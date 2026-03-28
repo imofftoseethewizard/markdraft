@@ -112,6 +112,38 @@ COMMENT_HEADER = """\
                               </div>"""
 
 
+AUTO_THEME_SCRIPT = """\
+<script>
+  (function() {
+    function applyTheme(dark) {
+      var t = dark ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', t);
+      document.documentElement.setAttribute('data-color-mode', t);
+      var mc = document.getElementById('markdraft-markdown-css');
+      var mca = document.getElementById('markdraft-markdown-css-alt');
+      var hc = document.getElementById('markdraft-highlight-css');
+      var hca = document.getElementById('markdraft-highlight-css-alt');
+      if (dark) {
+        if (mc) mc.disabled = true;
+        if (mca) mca.disabled = false;
+        if (hc) hc.disabled = true;
+        if (hca) hca.disabled = false;
+      } else {
+        if (mc) mc.disabled = false;
+        if (mca) mca.disabled = true;
+        if (hc) hc.disabled = false;
+        if (hca) hca.disabled = true;
+      }
+      var app = document.getElementById('markdraft-app');
+      if (app) app.setAttribute('data-theme', t);
+    }
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    applyTheme(mq.matches);
+    mq.addEventListener('change', function(e) { applyTheme(e.matches); });
+  })();
+  </script>"""
+
+
 class PreviewServer(ThreadingHTTPServer):
     """Threaded HTTP server for markdown preview."""
 
@@ -151,7 +183,11 @@ class PreviewServer(ThreadingHTTPServer):
         )
 
         theme = cfg.get("theme", "light")
-        data_color_mode = "dark" if theme == "dark" else "light"
+        is_auto = theme == "auto"
+        if is_auto:
+            data_color_mode = "light"  # initial; JS will update
+        else:
+            data_color_mode = "dark" if theme == "dark" else "light"
         markdown_css = (
             "github-markdown-dark.css"
             if theme == "dark"
@@ -185,6 +221,19 @@ class PreviewServer(ThreadingHTTPServer):
                 box_header = BOX_HEADER.format(display_title=display_title)
             page_body = README_BODY.format(box_header=box_header)
 
+        # For auto theme: load alternate CSS (disabled) and a script to toggle
+        if is_auto:
+            auto_css = (
+                '  <link rel="stylesheet" href="{0}/github-markdown-dark.css"'
+                ' id="markdraft-markdown-css-alt" disabled />\n'
+                '  <link rel="stylesheet" href="{0}/github-highlight-dark.min.css"'
+                ' id="markdraft-highlight-css-alt" disabled />'
+            ).format(static_url)
+            auto_theme_script = AUTO_THEME_SCRIPT
+        else:
+            auto_css = ""
+            auto_theme_script = ""
+
         return self.get_template().format(
             title=page_title,
             favicon_url=static_url + "/favicon.ico",
@@ -192,6 +241,8 @@ class PreviewServer(ThreadingHTTPServer):
             markdown_css_url=static_url + "/" + markdown_css,
             highlight_css_url=static_url + "/" + highlight_css,
             katex_css_url=KATEX_CSS_URL,
+            auto_css=auto_css,
+            auto_theme_script=auto_theme_script,
             content_url=content_path,
             refresh_url=refresh_url,
             data_color_mode=data_color_mode,

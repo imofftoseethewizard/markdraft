@@ -29,7 +29,7 @@ def _resolve_config(
     port: int | None = None,
     autorefresh: bool | None = None,
     quiet: bool | None = None,
-    theme: str = "light",
+    theme: str = "auto",
     title: str | None = None,
     user_content: bool = False,
     wide: bool = False,
@@ -85,7 +85,7 @@ def serve(
     autorefresh: bool = True,
     browser: bool = False,
     quiet: bool | None = None,
-    theme: str = "light",
+    theme: str = "auto",
 ) -> None:
     """Start the preview server."""
     reader = _make_reader(path)
@@ -129,7 +129,7 @@ def export(
     out_filename: str | None = None,
     title: str | None = None,
     quiet: bool = False,
-    theme: str = "light",
+    theme: str = "auto",
 ) -> None:
     """Export rendered markdown to an HTML file."""
     reader = _make_reader(path)
