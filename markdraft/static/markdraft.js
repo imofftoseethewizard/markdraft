@@ -4,8 +4,11 @@
   var app = document.getElementById('markdraft-app');
   var contentUrl = app.getAttribute('data-content-url');
   var refreshUrl = app.getAttribute('data-refresh-url');
-  var theme = app.getAttribute('data-theme') || 'light';
   var idCounter = 0;
+
+  function currentTheme() {
+    return document.documentElement.getAttribute('data-theme') || 'light';
+  }
 
   // --- Configure marked ---
 
@@ -112,7 +115,7 @@
         var height = 400;
 
         var scene = new THREE.Scene();
-        scene.background = new THREE.Color(theme === 'dark' ? 0x1a1a2e : 0xf0f0f0);
+        scene.background = new THREE.Color(currentTheme() === 'dark' ? 0x1a1a2e : 0xf0f0f0);
         var camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
         var rendererGL = new THREE.WebGLRenderer({ antialias: true });
         rendererGL.setSize(width, height);
@@ -288,7 +291,7 @@
       try {
         mermaid.initialize({
           startOnLoad: false,
-          theme: theme === 'dark' ? 'dark' : 'default'
+          theme: currentTheme() === 'dark' ? 'dark' : 'default'
         });
         mermaid.run({ querySelector: '.mermaid' });
       } catch (e) {
