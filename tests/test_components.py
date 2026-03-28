@@ -24,7 +24,6 @@ from markdraft.exceptions import ReadmeNotFoundError
 from markdraft.readers import DirectoryReader, StdinReader, TextReader
 from markdraft.watcher import FileWatcher
 
-
 DIRNAME = os.path.dirname(os.path.abspath(__file__))
 
 

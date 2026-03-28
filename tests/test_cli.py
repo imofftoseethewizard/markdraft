@@ -75,7 +75,9 @@ class TestMainDirect:
 
     def test_clear_flag(self, monkeypatch):
         cleared = []
-        monkeypatch.setattr("markdraft.command.clear_cache", lambda: cleared.append(True))
+        monkeypatch.setattr(
+            "markdraft.command.clear_cache", lambda: cleared.append(True)
+        )
         assert main(["--clear"]) == 0
         assert len(cleared) == 1
 

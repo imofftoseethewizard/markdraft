@@ -137,7 +137,10 @@ class TestApiRefresh:
         assert 'data-refresh-url="/__/api/refresh"' in client.get("/").text()
 
     def test_refresh_disabled_returns_404(self, text_server):
-        assert text_server("text", autorefresh=False).get("/__/api/refresh").status_code == 404
+        assert (
+            text_server("text", autorefresh=False).get("/__/api/refresh").status_code
+            == 404
+        )
 
 
 class TestStaticFiles:
@@ -209,7 +212,10 @@ class TestRouting:
         assert "image/png" in resp.headers.get("Content-Type", "")
 
     def test_path_traversal_blocked(self, dir_server):
-        assert dir_server({"README.md": "hi"}).get("/../../../etc/passwd").status_code == 404
+        assert (
+            dir_server({"README.md": "hi"}).get("/../../../etc/passwd").status_code
+            == 404
+        )
 
     def test_directory_redirect(self, dir_server):
         client = dir_server({"README.md": "root", "sub/README.md": "sub"})
