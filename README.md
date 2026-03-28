@@ -1,254 +1,233 @@
-Gripper -- Grip with Mermaid Diagrams
-======================================
+# Markdraft
 
-A fork of [Grip](https://github.com/joeyespo/grip) that renders
-` ```mermaid ` fenced code blocks as inline SVG diagrams.
-
-Everything else works exactly like stock Grip: render local readme files
-before sending off to GitHub, with styles and rendering that come directly
-from GitHub so you'll know exactly how it will appear. Changes you make
-to the Readme will be instantly reflected in the browser without requiring
-a page refresh.
-
-Gripper defaults to **offline rendering** with mermaid support, so no
-GitHub API key is needed for basic usage.
-
-
-Installation
-------------
-
-Install in a devcontainer (recommended) or any environment with Python 3.12+,
-Node 20+, and Chromium:
+Preview local markdown files in the browser with mermaid diagram support,
+syntax highlighting, and live reload. Zero runtime dependencies.
 
 ```console
-$ pip install -e '.[tests]'
-$ npm install -g @mermaid-js/mermaid-cli
+$ draft README.md
+ * Serving on http://localhost:6419/
 ```
 
 
-Usage
------
-
-To render the readme of a repository:
+## Installation
 
 ```console
-$ cd myrepo
-$ gripper
- * Running on http://localhost:6419/
+pip install markdraft
 ```
 
-Now open a browser and visit [http://localhost:6419](http://localhost:6419/).
-Or run with `-b` and Gripper will open a new browser tab for you.
-
-You can also specify a port:
+Or with [uv](https://docs.astral.sh/uv/):
 
 ```console
-$ gripper 80
- * Running on http://localhost:80/
+uv tool install markdraft
 ```
 
-Or an explicit file:
+Requires Python 3.10+. On first run, markdraft downloads ~3 MB of
+JavaScript libraries (marked.js, highlight.js, mermaid.js) from
+[jsDelivr](https://www.jsdelivr.com/) and caches them in
+`~/.markdraft/`.
+
+
+## Usage
+
+Preview a file:
 
 ```console
-$ gripper AUTHORS.md
- * Running on http://localhost:6419/
+$ draft README.md
+ * Serving on http://localhost:6419/
 ```
 
-You can combine the previous examples. Or specify a hostname instead of a port. Or provide both.
+Preview a directory (serves its README.md):
 
 ```console
-$ gripper CHANGES.md 0.0.0.0
- * Running on http://0.0.0.0:6419/
+$ draft .
 ```
 
-You can even bypass the server and **export** to a single HTML file, with all the styles and assets inlined:
+Open the browser automatically:
 
 ```console
-$ gripper --export
+$ draft -b README.md
+```
+
+Specify host and port:
+
+```console
+$ draft README.md 0.0.0.0:8080
+```
+
+Export to a self-contained HTML file:
+
+```console
+$ draft --export README.md
 Exporting to README.html
 ```
 
-Control the output name with the second argument:
+Export with CDN links instead of inlined assets:
 
 ```console
-$ gripper README.md --export index.html
-Exporting to index.html
+$ draft --export --no-inline README.md
 ```
 
-
-### Mermaid diagrams
-
-Any fenced code block with the `mermaid` language tag is automatically
-rendered as an inline SVG diagram:
-
-````markdown
-```mermaid
-graph LR
-    A[Start] --> B[End]
-```
-
-```mermaid
-sequenceDiagram
-    Alice->>Bob: Hello
-    Bob-->>Alice: Hi
-```
-````
-
-If `mmdc` is not available or rendering fails, the raw mermaid source is
-shown as a code block instead.
-
-
-### GitHub API rendering
-
-The original `grip` command is still available and works exactly as before,
-defaulting to the GitHub Markdown API renderer. Use it when you need
-pixel-perfect GitHub rendering and have API credentials configured:
+Dark mode:
 
 ```console
-$ grip --user <your-username> --pass <your-password>
+$ draft --theme=dark README.md
 ```
 
-Or use a [personal access token][]:
+The `mdraft` command is also available as an alias, for environments
+where `draft` conflicts with [Azure Draft](https://github.com/Azure/draft).
 
-```console
-$ grip --pass <token>
+
+## Features
+
+- **Live reload** — file changes are detected and the browser refreshes
+  automatically via Server-Sent Events
+- **Mermaid diagrams** — fenced code blocks with the `mermaid` language
+  tag are rendered as diagrams by [mermaid.js](https://mermaid.js.org/)
+- **Syntax highlighting** — code blocks are highlighted by
+  [highlight.js](https://highlightjs.org/)
+- **GitHub styling** — rendered with
+  [github-markdown-css](https://github.com/sindresorhus/github-markdown-css)
+  for a familiar look
+- **Export** — produce a self-contained HTML file that renders in any
+  browser, with all assets inlined or linked via CDN
+- **Zero dependencies** — the Python package has no runtime dependencies;
+  rendering is done client-side by cached JavaScript libraries
+- **Dark mode** — `--theme=dark` for dark color scheme
+
+
+## CLI Reference
+
+```
+usage: draft [-h] [-V] [--user-content] [--wide] [--clear] [--export]
+             [--no-inline] [-b] [--title TITLE] [--norefresh] [--quiet]
+             [--theme THEME]
+             [path] [address]
 ```
 
-You can persist these options [in your local configuration](#configuration).
+| Flag | Description |
+|------|-------------|
+| `path` | File or directory to render (`-` for stdin) |
+| `address` | `host:port` to listen on, or output file for `--export` |
+| `-b, --browser` | Open browser tab after server starts |
+| `--export` | Export to HTML file instead of serving |
+| `--no-inline` | Use CDN links instead of inlining assets in export |
+| `--title TITLE` | Override the page title |
+| `--theme THEME` | Color theme: `light` (default) or `dark` |
+| `--user-content` | Render as GitHub issue/comment style |
+| `--wide` | Wide layout (with `--user-content`) |
+| `--norefresh` | Disable auto-refresh on file change |
+| `--quiet` | Suppress terminal output |
+| `--clear` | Clear the cached assets and exit |
+| `-V` | Show version and exit |
 
 
-Architecture
-------------
-
-Gripper adds a `GripperRenderer` class (`grip/mermaid.py`) that subclasses
-the existing `OfflineRenderer`. Its rendering pipeline:
-
-1. **Extract** mermaid fenced code blocks from raw markdown via regex
-2. **Replace** each with a unique placeholder that survives markdown rendering
-3. **Render** the remaining markdown to HTML via the parent `OfflineRenderer`
-4. **Convert** each mermaid block to SVG by shelling out to `mmdc` (mermaid-cli)
-5. **Substitute** the SVG (wrapped in `<div class="mermaid-diagram">`) back
-   into the HTML, replacing placeholders
-
-The full rendering pipeline is:
-
-```
-reader.read(subpath)
-  -> GripperRenderer.render(text, auth)
-       -> extract mermaid blocks
-       -> OfflineRenderer.render(remaining text)
-       -> mmdc (mermaid blocks -> SVG)
-       -> substitute SVGs for placeholders
-  -> Flask template (index.html) via {{ content|safe }}
-```
-
-`GripperRenderer` is the default renderer. No GitHub API calls are made
-unless you explicitly use `GitHubRenderer`.
-
-
-Configuration
--------------
-
-To customize Gripper, create `~/.grip/settings.py`, then add one or more of the following variables:
-
-- `HOST`: The host to use when not provided as a CLI argument, `localhost` by default
-- `PORT`: The port to listen on, `6419` by default
-- `DEBUG`: Whether to use Flask's debugger when an error happens, `False` by default
-- `DEBUG_GRIP`: Prints extended information when an error happens, `False` by default
-- `API_URL`: Base URL for the GitHub API, for example that of a GitHub Enterprise instance. `https://api.github.com` by default
-- `CACHE_DIRECTORY`: The directory, relative to `~/.grip`, to place cached assets, `'cache-{version}'` by default
-- `AUTOREFRESH`: Whether to automatically refresh the Readme content when the file changes, `True` by default
-- `QUIET`: Do not print extended information, `False` by default
-- `STYLE_URLS`: Additional URLs that will be added to the rendered page, `[]` by default
-- `USERNAME`: The user to authenticate with GitHub, `None` by default
-- `PASSWORD`: The password or [personal access token][] to authenticate with GitHub, `None` by default
-
-
-#### Environment variables
-
-- `GRIPHOME`: Specify an alternative `settings.py` location, `~/.grip` by default
-- `GRIPURL`: The URL of the Grip server, `/__/grip` by default
-
-
-API
----
-
-You can access the API directly with Python, using it in your own projects:
+## Python API
 
 ```python
-from grip import serve
+from markdraft import serve, export, clear_cache
 
-serve(port=8080)
- * Running on http://localhost:8080/
+# Start a preview server
+serve("README.md", port=8080, browser=True)
+
+# Export to HTML
+export("README.md", out_filename="preview.html")
+
+# Clear cached CDN assets
+clear_cache()
 ```
 
-Or access the underlying Flask application for even more flexibility:
+
+## Configuration
+
+Create `~/.markdraft/settings.py` to override defaults:
 
 ```python
-from grip import create_app
-
-app = create_app(user_content=True)
+HOST = "0.0.0.0"
+PORT = 8080
+AUTOREFRESH = True
+QUIET = False
 ```
 
-The `GripperRenderer` can also be used standalone:
+The `MARKDRAFT_HOME` environment variable overrides the config directory
+(default `~/.markdraft`).
 
-```python
-from grip import GripperRenderer
 
-renderer = GripperRenderer()
-html = renderer.render('# Hello\n\n```mermaid\ngraph LR\n    A-->B\n```')
+## Architecture
+
+Markdraft is a thin HTTP server built on Python's `http.server`. It
+serves raw markdown via a JSON API and lets the browser handle all
+rendering:
+
+```
+Browser                          Server (http.server)
+  │  GET /                         │
+  │───────────────────────────────>│ HTML shell (template + script tags)
+  │  GET /__/api/content           │
+  │───────────────────────────────>│ raw markdown as JSON
+  │  [marked.js renders markdown]  │
+  │  [highlight.js highlights code]│
+  │  [mermaid.js renders diagrams] │
+  │  GET /__/api/refresh (SSE)     │
+  │───────────────────────────────>│ file change notifications
 ```
 
-See the upstream [Grip documentation](https://github.com/joeyespo/grip)
-for the full API reference.
+Modules:
+
+| Module | Purpose |
+|--------|---------|
+| `markdraft/server.py` | HTTP server with routing |
+| `markdraft/readers.py` | File/directory/stdin reading |
+| `markdraft/assets.py` | CDN asset downloading and caching |
+| `markdraft/export.py` | Self-contained HTML export |
+| `markdraft/watcher.py` | File change detection for auto-refresh |
+| `markdraft/browser.py` | Browser tab opening |
+| `markdraft/config.py` | Constants, CDN URLs, settings loader |
+| `markdraft/command.py` | CLI argument parsing |
 
 
-Testing
--------
-
-Install the package and test requirements:
+## Development
 
 ```console
-$ pip install -e .[tests]
+git clone https://github.com/user/markdraft
+cd markdraft
+uv sync
+uv run pytest              # 138 tests, ~7s parallel
+uv run pyright markdraft/  # type checking
+uv run black markdraft/ tests/  # formatting
 ```
 
-Run tests with [pytest][]:
 
-```console
-$ pytest
-```
+## Acknowledgments
 
-Verify mermaid rendering manually:
+Markdraft began as a fork of [Grip](https://github.com/joeyespo/grip)
+by [Joe Esposito](https://github.com/joeyespo). Grip is a well-crafted
+tool for previewing GitHub-flavored markdown locally, and its reader
+abstractions and CLI design informed markdraft's architecture.
 
-```console
-$ gripper tests/mermaid_test.md
-```
+### Major changes from Grip
 
-The rendered page should show two SVG diagrams inline with the surrounding text.
-
-
-Devcontainer
-------------
-
-The `.devcontainer/` is configured with:
-
-- Python 3.12
-- Node 20
-- Chromium + puppeteer dependencies
-- `pip install -e '.[tests]'` and `npm install -g @mermaid-js/mermaid-cli` on create
-- Port 6419 forwarded
-
-Open the repo in a devcontainer to develop and test.
-
-
-Contributing
-------------
-
-1. Check the open issues or open a new issue to start a discussion around
-   your feature idea or the bug you found
-2. Fork the repository and make your changes
-3. Open a new pull request
+- **Zero runtime dependencies** — Grip depends on Flask, Markdown,
+  Pygments, requests, docopt, path-and-address, and Werkzeug. Markdraft
+  has no pip dependencies; it uses only the Python standard library.
+- **Client-side rendering** — Grip renders markdown server-side with
+  Python. Markdraft serves raw markdown and renders it in the browser
+  with [marked.js](https://github.com/markedjs/marked),
+  [highlight.js](https://github.com/highlightjs/highlight.js), and
+  [mermaid.js](https://github.com/mermaid-js/mermaid).
+- **Mermaid diagram support** — natively renders ` ```mermaid ` fenced
+  code blocks as diagrams.
+- **stdlib HTTP server** — replaces Flask with `http.server.ThreadingHTTPServer`.
+- **Modern Python** — requires Python 3.10+, uses type annotations
+  throughout, drops all Python 2 compatibility code.
+- **uv project management** — uses `pyproject.toml` with hatchling
+  build backend, managed by [uv](https://docs.astral.sh/uv/).
+- **Security hardening** — path traversal protection via
+  `Path.relative_to()`, symlink escape prevention, case-insensitive
+  `</script>` escaping in exports.
+- **GitHub API removed** — Grip's primary mode was to POST markdown to
+  the GitHub API for rendering. Markdraft renders entirely offline.
 
 
-[personal access token]: https://github.com/settings/tokens/new?scopes=
-[pytest]: http://pytest.org/
+## License
+
+MIT
