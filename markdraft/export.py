@@ -163,7 +163,7 @@ def export_page(
 
     if inline:
         # Read all assets and inline them
-        css_files = ["github-markdown.css", highlight_css_name]
+        css_files = ["github-markdown.css", highlight_css_name, "leaflet.css"]
         js_files = [
             "marked.min.js",
             "marked-alert.umd.js",
@@ -171,6 +171,8 @@ def export_page(
             "katex.min.js",
             "marked-katex-extension.umd.js",
             "mermaid.min.js",
+            "leaflet.js",
+            "three.min.js",
         ]
 
         head_parts = []
@@ -195,11 +197,15 @@ def export_page(
     else:
         # Link to CDN
         cdn = CDN_ASSETS
-        head_assets = (
-            '  <link rel="stylesheet" href="{0}" />\n'
-            '  <link rel="stylesheet" href="{1}" />\n'
-            '  <link rel="stylesheet" href="{2}" />'
-        ).format(cdn["github-markdown.css"], cdn[highlight_css_name], KATEX_CSS_URL)
+        head_assets = "\n".join(
+            '  <link rel="stylesheet" href="{0}" />'.format(url)
+            for url in [
+                cdn["github-markdown.css"],
+                cdn[highlight_css_name],
+                KATEX_CSS_URL,
+                cdn["leaflet.css"],
+            ]
+        )
 
         script_assets = "\n".join(
             '  <script src="{0}"></script>'.format(cdn[name])
@@ -210,6 +216,8 @@ def export_page(
                 "katex.min.js",
                 "marked-katex-extension.umd.js",
                 "mermaid.min.js",
+                "leaflet.js",
+                "three.min.js",
             ]
         )
 

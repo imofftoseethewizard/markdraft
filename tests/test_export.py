@@ -25,6 +25,9 @@ class MockAssetCache(AssetCache):
             "katex.min.js",
             "marked-katex-extension.umd.js",
             "mermaid.min.js",
+            "leaflet.js",
+            "leaflet.css",
+            "three.min.js",
         ]:
             with open(os.path.join(path, name), "w") as f:
                 f.write("/* dummy {0} */".format(name))

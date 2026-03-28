@@ -101,6 +101,10 @@ where `draft` conflicts with [Azure Draft](https://github.com/Azure/draft).
   [highlight.js](https://highlightjs.org/)
 - **GitHub Alerts** — `> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`,
   `> [!WARNING]`, `> [!CAUTION]` styled callout boxes
+- **GeoJSON maps** — ` ```geojson ` and ` ```topojson ` rendered as
+  interactive maps by [Leaflet](https://leafletjs.com/)
+- **STL 3D models** — ` ```stl ` rendered as rotating 3D views by
+  [Three.js](https://threejs.org/)
 - **Task lists** — `- [x]` and `- [ ]` checkboxes
 - **GitHub styling** — rendered with
   [github-markdown-css](https://github.com/sindresorhus/github-markdown-css)
@@ -164,12 +168,126 @@ $$\int_{-\infty}^{\infty} e^{-x^2} \, dx = \sqrt{\pi}$$
 > [!CAUTION]
 > This is a caution — potential for data loss or security risk.
 
+### GeoJSON maps
+
+```geojson
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-122.42, 37.78], [-122.42, 37.77], [-122.41, 37.77],
+          [-122.41, 37.78], [-122.42, 37.78]
+        ]]
+      },
+      "properties": { "name": "San Francisco" }
+    }
+  ]
+}
+```
+
+### STL 3D models
+
+```stl
+solid cube
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 1 0 0
+      vertex 1 1 0
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0 0 0
+      vertex 1 1 0
+      vertex 0 1 0
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex 1 1 1
+      vertex 1 0 1
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 1
+      vertex 0 1 1
+      vertex 1 1 1
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 0 0 0
+      vertex 1 0 1
+      vertex 1 0 0
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 0 0 0
+      vertex 0 0 1
+      vertex 1 0 1
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 1 0 0
+      vertex 1 0 1
+      vertex 1 1 1
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 1 0 0
+      vertex 1 1 1
+      vertex 1 1 0
+    endloop
+  endfacet
+  facet normal 0 1 0
+    outer loop
+      vertex 0 1 0
+      vertex 1 1 0
+      vertex 1 1 1
+    endloop
+  endfacet
+  facet normal 0 1 0
+    outer loop
+      vertex 0 1 0
+      vertex 1 1 1
+      vertex 0 1 1
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0 0 0
+      vertex 0 1 0
+      vertex 0 1 1
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0 0 0
+      vertex 0 1 1
+      vertex 0 0 1
+    endloop
+  endfacet
+endsolid cube
+```
+
 ### Task lists
 
 - [x] Syntax highlighting
 - [x] Mermaid diagrams
 - [x] Math / LaTeX
 - [x] GitHub Alerts
+- [x] GeoJSON maps
+- [x] STL 3D models
 - [x] Task lists
 - [ ] Emoji shortcodes (not yet supported)
 
@@ -311,6 +429,8 @@ abstractions and CLI design informed markdraft's architecture.
   styled callout boxes.
 - **Mermaid diagram support** — ` ```mermaid ` fenced code blocks
   rendered as diagrams.
+- **GeoJSON maps and STL 3D models** — interactive maps via Leaflet,
+  rotating 3D model views via Three.js.
 - **stdlib HTTP server** — replaces Flask with
   `http.server.ThreadingHTTPServer`.
 - **Modern Python** — requires Python 3.10+, full type annotations,

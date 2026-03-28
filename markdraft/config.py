@@ -47,6 +47,11 @@ CDN_ASSETS = {
     "marked-katex-extension.umd.js": "https://cdn.jsdelivr.net/npm/marked-katex-extension",
     # GitHub-style alerts ([!NOTE], [!WARNING], etc.)
     "marked-alert.umd.js": "https://cdn.jsdelivr.net/npm/marked-alert",
+    # GeoJSON map rendering
+    "leaflet.js": "https://cdn.jsdelivr.net/npm/leaflet@1/dist/leaflet.js",
+    "leaflet.css": "https://cdn.jsdelivr.net/npm/leaflet@1/dist/leaflet.css",
+    # STL 3D model rendering
+    "three.min.js": "https://cdn.jsdelivr.net/npm/three@0.170/build/three.min.js",
 }
 
 # KaTeX CSS is loaded from CDN directly (references relative font URLs

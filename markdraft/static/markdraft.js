@@ -5,6 +5,7 @@
   var contentUrl = app.getAttribute('data-content-url');
   var refreshUrl = app.getAttribute('data-refresh-url');
   var theme = app.getAttribute('data-theme') || 'light';
+  var idCounter = 0;
 
   // --- Configure marked ---
 
@@ -25,27 +26,35 @@
   });
 
   // Register marked-katex-extension for $inline$ and $$display$$ math.
-  // This integrates with marked's tokenizer so it correctly skips code spans.
   if (typeof markedKatex !== 'undefined') {
     marked.use(markedKatex.default
       ? markedKatex.default({ throwOnError: false })
       : markedKatex({ throwOnError: false }));
   }
 
-  // Register marked-alert for GitHub-style alerts
-  // ([!NOTE], [!TIP], [!IMPORTANT], [!WARNING], [!CAUTION])
+  // Register marked-alert for GitHub-style alerts.
   if (typeof markedAlert !== 'undefined') {
     marked.use(markedAlert.markedAlert
       ? markedAlert.markedAlert()
       : markedAlert());
   }
 
-  // Custom renderer: mermaid code blocks become <pre class="mermaid">
+  // Custom renderer for special code blocks.
   var renderer = new marked.Renderer();
   var origCode = renderer.code;
   renderer.code = function (code, language, escaped) {
     if (language === 'mermaid') {
       return '<pre class="mermaid">' + escapeHtml(code) + '</pre>';
+    }
+    if (language === 'geojson' || language === 'topojson') {
+      var mapId = 'markdraft-map-' + (idCounter++);
+      return '<div id="' + mapId + '" class="markdraft-map" data-geojson="' +
+        escapeHtml(code) + '"></div>';
+    }
+    if (language === 'stl') {
+      var stlId = 'markdraft-stl-' + (idCounter++);
+      return '<div id="' + stlId + '" class="markdraft-stl" data-stl="' +
+        escapeHtml(code) + '"></div>';
     }
     if (origCode) {
       return origCode.call(this, code, language, escaped);
@@ -62,10 +71,118 @@
             .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  function unescapeHtml(s) {
+    return s.replace(/&quot;/g, '"').replace(/&gt;/g, '>')
+            .replace(/&lt;/g, '<').replace(/&amp;/g, '&');
+  }
+
+  // --- Post-render: GeoJSON maps ---
+
+  function initGeoJSON() {
+    if (typeof L === 'undefined') return;
+    var maps = document.querySelectorAll('.markdraft-map');
+    maps.forEach(function (el) {
+      if (el.dataset.initialized) return;
+      el.dataset.initialized = 'true';
+      try {
+        var data = JSON.parse(unescapeHtml(el.getAttribute('data-geojson')));
+        var map = L.map(el.id).setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors',
+          maxZoom: 19
+        }).addTo(map);
+        var layer = L.geoJSON(data).addTo(map);
+        map.fitBounds(layer.getBounds().pad(0.1));
+      } catch (e) {
+        el.innerHTML = '<p style="color:red">GeoJSON error: ' + escapeHtml(String(e)) + '</p>';
+      }
+    });
+  }
+
+  // --- Post-render: STL 3D models ---
+
+  function initSTL() {
+    if (typeof THREE === 'undefined') return;
+    var viewers = document.querySelectorAll('.markdraft-stl');
+    viewers.forEach(function (el) {
+      if (el.dataset.initialized) return;
+      el.dataset.initialized = 'true';
+      try {
+        var stlText = unescapeHtml(el.getAttribute('data-stl'));
+        var width = el.clientWidth || 600;
+        var height = 400;
+
+        var scene = new THREE.Scene();
+        scene.background = new THREE.Color(theme === 'dark' ? 0x1a1a2e : 0xf0f0f0);
+        var camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+        var rendererGL = new THREE.WebGLRenderer({ antialias: true });
+        rendererGL.setSize(width, height);
+        el.appendChild(rendererGL.domElement);
+
+        // Parse ASCII STL
+        var geometry = parseSTL(stlText);
+        var material = new THREE.MeshPhongMaterial({
+          color: 0x3498db, specular: 0x111111, shininess: 200
+        });
+        var mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        // Center and scale
+        geometry.computeBoundingBox();
+        var box = geometry.boundingBox;
+        var center = new THREE.Vector3();
+        box.getCenter(center);
+        mesh.position.sub(center);
+        var size = new THREE.Vector3();
+        box.getSize(size);
+        var maxDim = Math.max(size.x, size.y, size.z);
+        camera.position.set(0, 0, maxDim * 2);
+
+        // Lighting
+        scene.add(new THREE.AmbientLight(0x404040));
+        var light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(1, 1, 1);
+        scene.add(light);
+
+        // Simple rotation animation
+        function animate() {
+          requestAnimationFrame(animate);
+          mesh.rotation.y += 0.005;
+          rendererGL.render(scene, camera);
+        }
+        animate();
+      } catch (e) {
+        el.innerHTML = '<p style="color:red">STL error: ' + escapeHtml(String(e)) + '</p>';
+      }
+    });
+  }
+
+  function parseSTL(text) {
+    // Simple ASCII STL parser
+    var geometry = new THREE.BufferGeometry();
+    var vertices = [];
+    var lines = text.split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (line.startsWith('vertex')) {
+        var parts = line.split(/\s+/);
+        vertices.push(parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3]));
+      }
+    }
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.computeVertexNormals();
+    return geometry;
+  }
+
+  // --- Core ---
+
   function renderMarkdown(text) {
+    idCounter = 0;
     var html = marked.parse(text, { renderer: renderer });
     document.getElementById('markdraft-content').innerHTML = html;
     initMermaid();
+    initGeoJSON();
+    initSTL();
   }
 
   function fetchAndRender() {
