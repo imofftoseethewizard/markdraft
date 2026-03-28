@@ -1,18 +1,15 @@
-# Deployment files
+# Build artifacts
 *.egg-info
 dist
-
-# Environment files
-site-packages
-instance
 build
-env
+
+# Environment
 .venv
-.cache
+site-packages
 *.py[cod]
 settings_local.py
 
-# Test files
+# Test
 .pytest_cache
 
 # OS-specific files
