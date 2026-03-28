@@ -175,6 +175,44 @@
 
   // --- Core ---
 
+  function buildBreadcrumb(fullPath) {
+    var parts = fullPath.replace(/\/$/, '').split('/').filter(Boolean);
+    var html = '<a href="/">/</a>';
+    var accumulated = '';
+    for (var i = 0; i < parts.length; i++) {
+      accumulated += parts[i] + '/';
+      html += ' / <a href="/' + escapeHtml(accumulated) + '">'
+        + escapeHtml(parts[i]) + '</a>';
+    }
+    return html;
+  }
+
+  function buildSiblingNav(parentPath, entries, currentFile) {
+    if (!entries || entries.length === 0) return '';
+    var html = '<details class="markdraft-nav"><summary>Files</summary>';
+    html += '<ul class="markdraft-listing">';
+    entries.forEach(function (entry) {
+      var href, label;
+      var isCurrent = false;
+      if (entry.type === 'directory') {
+        href = '/' + parentPath + entry.name + '/';
+        label = entry.name + '/';
+      } else {
+        href = '/' + parentPath + entry.name;
+        label = entry.name;
+        if (currentFile && (parentPath + entry.name) === currentFile) {
+          isCurrent = true;
+        }
+      }
+      var cls = isCurrent ? ' class="current"' : '';
+      var icon = entry.type === 'directory' ? '\uD83D\uDCC1 ' : '\uD83D\uDCC4 ';
+      html += '<li' + cls + '>' + icon + '<a href="' + escapeHtml(href)
+        + '">' + escapeHtml(label) + '</a></li>';
+    });
+    html += '</ul></details>';
+    return html;
+  }
+
   function renderMarkdown(text) {
     idCounter = 0;
     var html = marked.parse(text);
@@ -186,9 +224,11 @@
 
   function renderListing(data) {
     var path = data.path || '';
-    var html = '<h2>' + escapeHtml(path || '/') + '</h2>';
-    html += '<ul class="markdraft-listing">';
-    // Parent directory link (if not at root)
+    var nav = document.getElementById('markdraft-nav');
+    if (nav) nav.innerHTML = '<div class="markdraft-breadcrumb">'
+      + buildBreadcrumb(path) + '</div>';
+
+    var html = '<ul class="markdraft-listing">';
     if (path && path !== '/') {
       var parent = path.replace(/[^\/]+\/$/, '');
       html += '<li>\uD83D\uDCC1 <a href="/' + escapeHtml(parent) + '">..</a></li>';
@@ -209,11 +249,23 @@
     document.getElementById('markdraft-content').innerHTML = html;
   }
 
+  function renderFile(data) {
+    var nav = document.getElementById('markdraft-nav');
+    if (nav) {
+      var breadcrumb = buildBreadcrumb(data.path || data.filename || '');
+      var siblings = buildSiblingNav(
+        data.parent || '', data.siblings || [], data.path || '');
+      nav.innerHTML = '<div class="markdraft-breadcrumb">' + breadcrumb
+        + '</div>' + siblings;
+    }
+    renderMarkdown(data.text);
+  }
+
   function renderContent(data) {
     if (data.type === 'listing') {
       renderListing(data);
     } else {
-      renderMarkdown(data.text);
+      renderFile(data);
     }
   }
 

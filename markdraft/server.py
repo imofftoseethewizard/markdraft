@@ -65,21 +65,13 @@ STATIC_DIR = _resolve_static_dir()
 # Page body variants for template.html
 README_BODY = """\
                   <div id="readme" class="Box md Box--responsive">
-                    {box_header}
+                    <div id="markdraft-nav" class="Box-header d-flex border-bottom-0 flex-items-center color-bg-default rounded-top-2">
+                    </div>
                     <div class="Box-body px-5 pb-5">
                       <article id="markdraft-content" class="markdown-body entry-content container-lg">
                       </article>
                     </div>
                   </div>"""
-
-BOX_HEADER = """\
-<div class="Box-header d-flex border-bottom-0 flex-items-center flex-justify-between color-bg-default rounded-top-2">
-                        <div class="d-flex flex-items-center">
-                          <h2 class="Box-title">
-                            {display_title}
-                          </h2>
-                        </div>
-                      </div>"""
 
 USER_CONTENT_BODY = """\
                   <div class="pull-discussion-timeline">
@@ -216,10 +208,7 @@ class PreviewServer(ThreadingHTTPServer):
                 comment_header = COMMENT_HEADER.format(title=display_title)
             page_body = USER_CONTENT_BODY.format(comment_header=comment_header)
         else:
-            box_header = ""
-            if display_title:
-                box_header = BOX_HEADER.format(display_title=display_title)
-            page_body = README_BODY.format(box_header=box_header)
+            page_body = README_BODY
 
         # For auto theme: load alternate CSS (disabled) and a script to toggle
         if is_auto:
@@ -332,7 +321,23 @@ class PreviewHandler(BaseHTTPRequestHandler):
                 return
             self._send_error(404)
             return
-        body = json.dumps({"type": "file", "text": text, "filename": filename})
+        # Include sibling listing for navigation
+        if subpath:
+            parent = posixpath.dirname(subpath.rstrip("/"))
+            parent_path = parent + "/" if parent else ""
+        else:
+            parent_path = ""
+        siblings = self.server.reader.list_directory(parent_path.rstrip("/") or None)
+        body = json.dumps(
+            {
+                "type": "file",
+                "text": text,
+                "filename": filename,
+                "path": subpath or "",
+                "parent": parent_path,
+                "siblings": siblings,
+            }
+        )
         self._send_text(200, body, "application/json; charset=utf-8")
 
     def _handle_api_refresh(self, path: str, url_prefix: str) -> None:

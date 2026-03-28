@@ -94,6 +94,39 @@
   height: 100% !important;
 }
 
+/* Breadcrumb navigation */
+.markdraft-breadcrumb {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.markdraft-breadcrumb a {
+  color: var(--fgColor-accent, #0969da);
+  text-decoration: none;
+}
+.markdraft-breadcrumb a:hover {
+  text-decoration: underline;
+}
+.markdraft-nav {
+  padding: 0 16px 8px;
+}
+.markdraft-nav summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--fgColor-muted, #656d76);
+  user-select: none;
+}
+.markdraft-nav .markdraft-listing {
+  margin-top: 4px;
+}
+.markdraft-nav .markdraft-listing .current a {
+  font-weight: 600;
+  color: var(--fgColor-default, #1f2328);
+}
+[data-theme="dark"] .markdraft-nav .markdraft-listing .current a {
+  color: var(--fgColor-default, #e6edf3);
+}
+
 /* Directory listing */
 .markdraft-listing {
   list-style: none;
