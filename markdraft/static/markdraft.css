@@ -94,6 +94,24 @@
   height: 100% !important;
 }
 
+/* Directory listing */
+.markdraft-listing {
+  list-style: none;
+  padding: 0;
+}
+.markdraft-listing li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--borderColor-default, #d0d7de);
+  font-size: 14px;
+}
+.markdraft-listing a {
+  text-decoration: none;
+  color: var(--fgColor-accent, #0969da);
+}
+.markdraft-listing a:hover {
+  text-decoration: underline;
+}
+
 /* KaTeX display math centering */
 .katex-display {
   text-align: center;

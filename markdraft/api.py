@@ -142,7 +142,12 @@ def export(
             export_to_stdout = True
         else:
             dir_reader = DirectoryReader(path)
-            filetitle, _ = os.path.splitext(os.path.relpath(dir_reader.root_filename))
+            if dir_reader.root_filename:
+                filetitle, _ = os.path.splitext(
+                    os.path.relpath(dir_reader.root_filename)
+                )
+            else:
+                filetitle = os.path.basename(os.path.abspath(path or "."))
             out_filename = "{0}.html".format(filetitle)
 
     if not export_to_stdout and not quiet:

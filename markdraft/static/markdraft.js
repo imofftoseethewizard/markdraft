@@ -184,12 +184,45 @@
     initSTL();
   }
 
+  function renderListing(data) {
+    var path = data.path || '';
+    var html = '<h2>' + escapeHtml(path || '/') + '</h2>';
+    html += '<ul class="markdraft-listing">';
+    // Parent directory link (if not at root)
+    if (path && path !== '/') {
+      var parent = path.replace(/[^\/]+\/$/, '');
+      html += '<li>\uD83D\uDCC1 <a href="/' + escapeHtml(parent) + '">..</a></li>';
+    }
+    data.entries.forEach(function (entry) {
+      var href;
+      if (entry.type === 'directory') {
+        href = '/' + path + entry.name + '/';
+        html += '<li>\uD83D\uDCC1 <a href="' + escapeHtml(href) + '">'
+          + escapeHtml(entry.name + '/') + '</a></li>';
+      } else {
+        href = '/' + path + entry.name;
+        html += '<li>\uD83D\uDCC4 <a href="' + escapeHtml(href) + '">'
+          + escapeHtml(entry.name) + '</a></li>';
+      }
+    });
+    html += '</ul>';
+    document.getElementById('markdraft-content').innerHTML = html;
+  }
+
+  function renderContent(data) {
+    if (data.type === 'listing') {
+      renderListing(data);
+    } else {
+      renderMarkdown(data.text);
+    }
+  }
+
   function fetchAndRender() {
     if (!contentUrl) return;
     fetch(contentUrl)
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        renderMarkdown(data.text);
+        renderContent(data);
       })
       .catch(function (err) {
         document.getElementById('markdraft-content').innerHTML =

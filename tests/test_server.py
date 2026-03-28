@@ -224,3 +224,58 @@ class TestRouting:
         client = dir_server({"README.md": "root", "sub/README.md": "sub"})
         resp = client.get("/sub")
         assert resp.status_code in (200, 302)
+
+
+class TestDirectoryListing:
+    """Directory browsing when no README is present."""
+
+    def test_directory_without_readme_returns_200(self, dir_server):
+        client = dir_server({"sub/guide.md": "# Guide"})
+        resp = client.get("/sub/")
+        assert resp.status_code == 200
+        assert "<!DOCTYPE html>" in resp.text()
+
+    def test_listing_api_returns_entries(self, dir_server):
+        client = dir_server(
+            {
+                "docs/guide.md": "# Guide",
+                "docs/api.md": "# API",
+                "docs/sub/README.md": "# Sub",
+            }
+        )
+        resp = client.get("/__/api/content/docs/")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["type"] == "listing"
+        names = [e["name"] for e in data["entries"]]
+        assert "guide.md" in names
+        assert "api.md" in names
+        assert "sub" in names
+
+    def test_listing_excludes_hidden_files(self, dir_server):
+        client = dir_server(
+            {
+                "docs/.hidden.md": "secret",
+                "docs/visible.md": "hi",
+            }
+        )
+        resp = client.get("/__/api/content/docs/")
+        data = resp.json()
+        names = [e["name"] for e in data["entries"]]
+        assert "visible.md" in names
+        assert ".hidden.md" not in names
+
+    def test_directory_with_readme_serves_readme(self, dir_server):
+        client = dir_server({"README.md": "# Root"})
+        resp = client.get("/__/api/content")
+        data = resp.json()
+        assert data["type"] == "file"
+        assert "# Root" in data["text"]
+
+    def test_root_without_readme_shows_listing(self, dir_server):
+        client = dir_server({"docs/guide.md": "# Guide"})
+        resp = client.get("/__/api/content")
+        data = resp.json()
+        assert data["type"] == "listing"
+        names = [e["name"] for e in data["entries"]]
+        assert "docs" in names

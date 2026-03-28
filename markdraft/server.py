@@ -295,10 +295,14 @@ class PreviewHandler(BaseHTTPRequestHandler):
             self._send_bytes(200, data, mimetype)
             return
 
-        # Verify the file exists before serving the shell
+        # Try to read the file; fall back to directory listing
         try:
             self.server.reader.read(subpath)
         except ReadmeNotFoundError:
+            if self.server.reader.is_directory(subpath):
+                page = self.server.build_page(subpath)
+                self._send_text(200, page, "text/html; charset=utf-8")
+                return
             self._send_error(404)
             return
 
@@ -311,9 +315,24 @@ class PreviewHandler(BaseHTTPRequestHandler):
             text = self.server.reader.read(subpath)
             filename = self.server.reader.filename_for(subpath) or ""
         except ReadmeNotFoundError:
+            # Directory with no README — return listing
+            if self.server.reader.is_directory(subpath):
+                entries = self.server.reader.list_directory(subpath)
+                listing_path = (subpath or "").rstrip("/")
+                if listing_path:
+                    listing_path += "/"
+                body = json.dumps(
+                    {
+                        "type": "listing",
+                        "path": listing_path,
+                        "entries": entries,
+                    }
+                )
+                self._send_text(200, body, "application/json; charset=utf-8")
+                return
             self._send_error(404)
             return
-        body = json.dumps({"text": text, "filename": filename})
+        body = json.dumps({"type": "file", "text": text, "filename": filename})
         self._send_text(200, body, "application/json; charset=utf-8")
 
     def _handle_api_refresh(self, path: str, url_prefix: str) -> None:

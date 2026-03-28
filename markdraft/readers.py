@@ -7,7 +7,7 @@ import sys
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 
-from .config import DEFAULT_FILENAMES, DEFAULT_FILENAME
+from .config import DEFAULT_FILENAMES, DEFAULT_FILENAME, SUPPORTED_EXTENSIONS
 from .exceptions import ReadmeNotFoundError
 
 
@@ -65,8 +65,14 @@ class ReadmeReader(object, metaclass=ABCMeta):
     def is_binary(self, subpath: str | None = None) -> bool:
         return False
 
+    def is_directory(self, subpath: str | None = None) -> bool:
+        return False
+
     def last_updated(self, subpath: str | None = None) -> float | None:
         return None
+
+    def list_directory(self, subpath: str | None = None) -> list[dict[str, str]]:
+        return []
 
     @abstractmethod
     def read(self, subpath: str | None = None) -> str | bytes:
@@ -75,33 +81,34 @@ class ReadmeReader(object, metaclass=ABCMeta):
 
 class DirectoryReader(ReadmeReader):
     """
-    Reads Readme files from URL subpaths.
+    Reads Readme files from URL subpaths. Supports directory browsing
+    when a directory has no README file.
     """
 
     def __init__(self, path: str | None = None, silent: bool = False) -> None:
         super().__init__()
-        root_filename = os.path.abspath(self._resolve_readme(path, silent))
-        self.root_filename = root_filename
-        self.root_directory = os.path.dirname(root_filename)
-
-    def _find_file(self, path: str, silent: bool = False) -> str:
-        for filename in DEFAULT_FILENAMES:
-            full_path = os.path.join(path, filename) if path else filename
-            if os.path.exists(full_path):
-                return full_path
-        if silent:
-            return os.path.join(path, DEFAULT_FILENAME)
-        raise ReadmeNotFoundError(path)
-
-    def _resolve_readme(self, path: str | None = None, silent: bool = False) -> str:
         if path is None:
             path = "."
         path = os.path.normpath(path)
+
         if os.path.isdir(path):
-            return self._find_file(path, silent)
-        if silent or os.path.exists(path):
-            return path
-        raise ReadmeNotFoundError(path, "File not found: " + path)
+            self.root_directory = os.path.abspath(path)
+            readme = self._find_readme(self.root_directory)
+            self.root_filename = readme  # None if no README found
+        elif os.path.exists(path) or silent:
+            abspath = os.path.abspath(path)
+            self.root_filename = abspath
+            self.root_directory = os.path.dirname(abspath)
+        else:
+            raise ReadmeNotFoundError(path, "File not found: " + path)
+
+    def _find_readme(self, dirpath: str) -> str | None:
+        """Find a README file in a directory. Returns None if not found."""
+        for filename in DEFAULT_FILENAMES:
+            full_path = os.path.join(dirpath, filename)
+            if os.path.exists(full_path):
+                return full_path
+        return None
 
     def _read_text(self, filename: str) -> str:
         with io.open(filename, "rt", encoding="utf-8") as f:
@@ -120,19 +127,23 @@ class DirectoryReader(ReadmeReader):
             subpath += "/"
         return subpath
 
-    def readme_for(self, subpath: str | None) -> str:
+    def readme_for(self, subpath: str | None) -> str | None:
+        """Return the file to read for the given subpath, or None for
+        a directory with no README."""
         if subpath is None:
-            return self.root_filename
+            return self.root_filename  # may be None
         filename = os.path.normpath(_safe_join(self.root_directory, subpath))
         if not os.path.exists(filename):
             raise ReadmeNotFoundError(filename)
         if os.path.isdir(filename):
-            return self._find_file(filename)
+            return self._find_readme(filename)
         return filename
 
     def filename_for(self, subpath: str | None) -> str | None:
         try:
             filename = self.readme_for(subpath)
+            if filename is None:
+                return None
             return os.path.relpath(filename, self.root_directory)
         except ReadmeNotFoundError:
             return None
@@ -141,9 +152,21 @@ class DirectoryReader(ReadmeReader):
         mimetype = self.mimetype_for(subpath)
         return bool(mimetype and not mimetype.startswith("text/"))
 
+    def is_directory(self, subpath: str | None = None) -> bool:
+        if subpath is None:
+            return os.path.isdir(self.root_directory)
+        try:
+            filename = os.path.normpath(_safe_join(self.root_directory, subpath))
+            return os.path.isdir(filename)
+        except ReadmeNotFoundError:
+            return False
+
     def last_updated(self, subpath: str | None = None) -> float | None:
         try:
-            return os.path.getmtime(self.readme_for(subpath))
+            readme = self.readme_for(subpath)
+            if readme is None:
+                return None
+            return os.path.getmtime(readme)
         except ReadmeNotFoundError:
             return None
         except OSError as ex:
@@ -151,16 +174,37 @@ class DirectoryReader(ReadmeReader):
                 return None
             raise
 
+    def list_directory(self, subpath: str | None = None) -> list[dict[str, str]]:
+        """List .md files and subdirectories at subpath."""
+        if subpath is None:
+            dirpath = self.root_directory
+        else:
+            dirpath = _safe_join(self.root_directory, subpath)
+        if not os.path.isdir(dirpath):
+            return []
+        entries: list[dict[str, str]] = []
+        for name in sorted(os.listdir(dirpath)):
+            if name.startswith("."):
+                continue
+            full = os.path.join(dirpath, name)
+            if os.path.isdir(full):
+                entries.append({"name": name, "type": "directory"})
+            elif any(name.endswith(ext) for ext in SUPPORTED_EXTENSIONS):
+                entries.append({"name": name, "type": "file"})
+        return entries
+
     def read(self, subpath: str | None = None) -> str | bytes:
         is_binary = self.is_binary(subpath)
-        filename = self.readme_for(subpath)
+        readme = self.readme_for(subpath)
+        if readme is None:
+            raise ReadmeNotFoundError(subpath or self.root_directory, "No README found")
         try:
             if is_binary:
-                return self._read_binary(filename)
-            return self._read_text(filename)
+                return self._read_binary(readme)
+            return self._read_text(readme)
         except OSError as ex:
             if ex.errno == errno.ENOENT:
-                raise ReadmeNotFoundError(filename)
+                raise ReadmeNotFoundError(readme)
             raise
 
 

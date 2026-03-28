@@ -45,13 +45,44 @@ class TestDirectoryReader:
         reader = DirectoryReader(input_path("gfm-test.md"))
         assert reader.root_filename.endswith("gfm-test.md")
 
-    def test_silent_missing(self):
-        reader = DirectoryReader(input_path("empty"), silent=True)
-        assert reader.root_filename.endswith("README.md")
+    def test_directory_without_readme(self):
+        reader = DirectoryReader(input_path("empty"))
+        assert reader.root_filename is None
+        assert reader.root_directory == os.path.abspath(input_path("empty"))
 
-    def test_raises_missing(self):
+    def test_missing_file_raises(self):
         with pytest.raises(ReadmeNotFoundError):
-            DirectoryReader(input_path("empty"))
+            DirectoryReader("/nonexistent/path/to/file.md")
+
+    def test_list_directory(self, tmp_path):
+        (tmp_path / "README.md").write_text("hi")
+        (tmp_path / "guide.md").write_text("guide")
+        (tmp_path / "sub").mkdir()
+        (tmp_path / ".hidden").write_text("secret")
+        reader = DirectoryReader(str(tmp_path))
+        entries = reader.list_directory()
+        names = [e["name"] for e in entries]
+        assert "README.md" in names
+        assert "guide.md" in names
+        assert "sub" in names
+        assert ".hidden" not in names
+
+    def test_list_directory_types(self, tmp_path):
+        (tmp_path / "README.md").write_text("hi")
+        (tmp_path / "sub").mkdir()
+        reader = DirectoryReader(str(tmp_path))
+        entries = reader.list_directory()
+        types = {e["name"]: e["type"] for e in entries}
+        assert types["README.md"] == "file"
+        assert types["sub"] == "directory"
+
+    def test_is_directory(self, tmp_path):
+        (tmp_path / "README.md").write_text("hi")
+        (tmp_path / "sub").mkdir()
+        reader = DirectoryReader(str(tmp_path))
+        assert reader.is_directory(None)
+        assert reader.is_directory("sub")
+        assert not reader.is_directory("README.md")
 
     def test_normalize_none(self):
         reader = DirectoryReader(input_path("default"))
