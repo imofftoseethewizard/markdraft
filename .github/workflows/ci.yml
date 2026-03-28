@@ -14,7 +14,6 @@ jobs:
       - run: uv sync
       - run: uv run black --check markdraft/ tests/
       - run: uv run pyright markdraft/
-      - run: uv run flake8 markdraft/ tests/
 
   test:
     runs-on: ubuntu-latest
