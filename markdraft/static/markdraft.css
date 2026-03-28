@@ -10,27 +10,27 @@
   width: 920px;
 }
 
-/* Dark mode: page background, box header, borders.
-   github-markdown-css handles .markdown-body colors but doesn't
-   define GitHub's Primer utility classes (.color-bg-default, .Box). */
-[data-color-mode="dark"] body {
-  background-color: #0d1117;
-  color: #e6edf3;
+/* Dark mode for page chrome outside .markdown-body.
+   github-markdown-css handles .markdown-body via [data-theme="dark"]
+   custom properties, but doesn't style the surrounding page elements. */
+[data-theme="dark"] body {
+  background-color: var(--bgColor-default, #0d1117);
+  color: var(--fgColor-default, #e6edf3);
 }
-[data-color-mode="dark"] .color-bg-default {
-  background-color: #161b22;
-  color: #e6edf3;
+[data-theme="dark"] .Box {
+  border-color: var(--borderColor-default, #3d444d);
+  background-color: var(--bgColor-default, #0d1117);
 }
-[data-color-mode="dark"] .Box {
-  border-color: #30363d;
-  background-color: #0d1117;
+[data-theme="dark"] .Box-header {
+  background-color: var(--bgColor-muted, #151b23);
+  border-bottom-color: var(--borderColor-default, #3d444d);
 }
-[data-color-mode="dark"] .Box-header {
-  background-color: #161b22;
-  border-bottom-color: #30363d;
+[data-theme="dark"] .Box-body {
+  background-color: var(--bgColor-default, #0d1117);
 }
-[data-color-mode="dark"] .Box-body {
-  background-color: #0d1117;
+[data-theme="dark"] .color-bg-default {
+  background-color: var(--bgColor-muted, #151b23);
+  color: var(--fgColor-default, #e6edf3);
 }
 
 /* GitHub-style alerts ([!NOTE], [!TIP], etc.) */
@@ -71,8 +71,8 @@
   border-radius: 6px;
   overflow: hidden;
 }
-[data-color-mode="dark"] .markdraft-map {
-  border-color: #30363d;
+[data-theme="dark"] .markdraft-map {
+  border-color: var(--borderColor-default, #3d444d);
 }
 
 /* STL 3D model containers */
@@ -84,8 +84,8 @@
   border-radius: 6px;
   overflow: hidden;
 }
-[data-color-mode="dark"] .markdraft-stl {
-  border-color: #30363d;
+[data-theme="dark"] .markdraft-stl {
+  border-color: var(--borderColor-default, #3d444d);
 }
 .markdraft-stl canvas {
   width: 100% !important;

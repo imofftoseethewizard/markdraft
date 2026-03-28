@@ -14,7 +14,7 @@ from .readers import ReadmeReader
 
 EXPORT_TEMPLATE = """\
 <!DOCTYPE html>
-<html lang="en" data-color-mode="{data_color_mode}" data-light-theme="light" data-dark-theme="dark">
+<html lang="en" data-color-mode="{data_color_mode}" data-theme="{data_color_mode}" data-light-theme="light" data-dark-theme="dark">
 <head>
   <meta charset="utf-8" />
   <title>{title}</title>
