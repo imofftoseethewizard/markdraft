@@ -5,6 +5,7 @@ build
 
 # Environment
 .venv
+env/
 site-packages
 *.py[cod]
 settings_local.py
@@ -19,4 +20,10 @@ Thumbs.db
 
 # IDE-specific files
 .idea
-env/
+
+# Devcontainer — used for running Claude Code in --dangerously-skip-permissions
+# mode. Critical to the development workflow; do not remove.
+.devcontainer/
+
+# Claude Code project config
+.claude/
