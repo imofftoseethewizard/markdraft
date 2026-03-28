@@ -27,5 +27,8 @@ Thumbs.db
 
 # Claude Code project config
 .claude/
+
+# Launch content (not shipped)
+launch/
 *.html
 *_files/
