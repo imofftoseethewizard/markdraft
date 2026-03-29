@@ -24,9 +24,12 @@
           emojis[name] = emoji;
         });
       });
-      marked.use(markedEmoji.default
-        ? markedEmoji.default({ emojis: emojis })
-        : markedEmoji({ emojis: emojis }));
+      var opts = {
+        emojis: emojis,
+        renderer: function (token) { return token.emoji; }
+      };
+      var fn = markedEmoji.markedEmoji || markedEmoji.default || markedEmoji;
+      marked.use(fn(opts));
     }
 
     if (typeof markedEmoji === 'undefined') {
