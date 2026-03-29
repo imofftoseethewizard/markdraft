@@ -29,6 +29,9 @@ class TestPageRoutes:
         assert "highlight.min.js" in html
         assert "katex.min.js" in html
         assert "mermaid.min.js" in html
+        assert "leaflet.js" in html
+        assert "three.min.js" in html
+        assert "marked-emoji.umd.js" in html
         assert "markdraft.js" in html
 
     def test_page_includes_css_links(self, text_server):
@@ -36,6 +39,7 @@ class TestPageRoutes:
         html = client.get("/").text()
         assert "github-markdown-light.css" in html
         assert "katex.min.css" in html
+        assert "leaflet.css" in html
         assert "markdraft.css" in html
         assert "octicons.css" in html
 
@@ -279,3 +283,32 @@ class TestDirectoryListing:
         assert data["type"] == "listing"
         names = [e["name"] for e in data["entries"]]
         assert "docs" in names
+
+    def test_file_response_includes_siblings(self, dir_server):
+        client = dir_server(
+            {
+                "README.md": "# Root",
+                "guide.md": "# Guide",
+                "other.md": "# Other",
+            }
+        )
+        data = client.get("/__/api/content").json()
+        assert data["type"] == "file"
+        assert "siblings" in data
+        names = [e["name"] for e in data["siblings"]]
+        assert "guide.md" in names
+        assert "other.md" in names
+
+    def test_subdir_readme_siblings_are_subdir_contents(self, dir_server):
+        client = dir_server(
+            {
+                "README.md": "# Root",
+                "sub/README.md": "# Sub",
+                "sub/api.md": "# API",
+            }
+        )
+        data = client.get("/__/api/content/sub/").json()
+        assert data["type"] == "file"
+        names = [e["name"] for e in data["siblings"]]
+        assert "api.md" in names
+        assert "README.md" in names

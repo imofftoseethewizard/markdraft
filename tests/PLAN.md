@@ -145,7 +145,28 @@ raw markdown from the API and renders it client-side.
 | S35 | `test_path_traversal_blocked` | README.md | `GET /../../../etc/passwd` | 404 |
 | S36 | `test_normalized_redirect` | README.md | `GET /sub` (dir exists) | 302 to `/sub/` |
 
-### Dimension 10: Quiet mode
+### Dimension 10: Directory browsing
+
+| ID | Test | Setup | Assertion |
+|----|------|-------|-----------|
+| S38 | `test_dir_without_readme_200` | sub/ with .md files, no README | 200, HTML shell |
+| S39 | `test_listing_api_entries` | docs/ with files and subdirs | JSON with type=listing, correct entries |
+| S40 | `test_listing_excludes_hidden` | .hidden.md + visible.md | Only visible in entries |
+| S41 | `test_dir_with_readme_serves_file` | README.md in dir | type=file, README content |
+| S42 | `test_root_without_readme_listing` | Only subdirs, no README | type=listing |
+| S43 | `test_file_response_includes_siblings` | Dir with multiple .md files | siblings array in file response |
+| S44 | `test_file_siblings_are_same_dir` | /sub/README.md | siblings list sub/ contents, not root |
+
+### Dimension 11: CDN asset presence
+
+| ID | Test | Asset | Assertion |
+|----|------|-------|-----------|
+| S45 | `test_page_has_katex` | KaTeX | `katex.min.js` in script tags |
+| S46 | `test_page_has_emoji` | Emoji | `marked-emoji.umd.js` in script tags |
+| S47 | `test_page_has_leaflet` | Leaflet | `leaflet.js` in script tags |
+| S48 | `test_page_has_three` | Three.js | `three.min.js` in script tags |
+
+### Dimension 12: Quiet mode
 
 | ID | Test | Config | Assertion |
 |----|------|--------|-----------|
@@ -183,7 +204,15 @@ Tests for `export_page()` which produces self-contained HTML.
 | E9 | `test_user_content_layout` | user_content=True | `pull-discussion-timeline`, no `id="readme"` |
 | E10 | `test_readme_layout_default` | default | `id="readme"`, no `pull-discussion-timeline` |
 
-### Dimension 4: Output destination
+### Dimension 4: Emoji support in export
+
+| ID | Test | Config | Assertion |
+|----|------|--------|-----------|
+| E14 | `test_inline_has_gemoji_data` | inline=True | `markdraft-gemoji` script tag with JSON |
+| E15 | `test_inline_has_emoji_extension` | inline=True | `marked-emoji` JS in output |
+| E16 | `test_no_inline_has_emoji_cdn` | inline=False | `marked-emoji` CDN link |
+
+### Dimension 5: Output destination
 
 | ID | Test | out_file | Assertion |
 |----|------|----------|-----------|
@@ -251,6 +280,10 @@ Unit tests for modules with non-trivial logic.
 | R17 | `test_text_reader_subpath_raises` | TextReader('text').read('x') | Raises ReadmeNotFoundError |
 | R18 | `test_text_reader_filename` | TextReader('t', 'f.md').filename_for(None) | Returns 'f.md' |
 | R19 | `test_stdin_reader_reads_once` | StdinReader mock | Calls read_stdin once |
+| R20 | `test_directory_without_readme` | DirectoryReader on empty dir | root_filename is None |
+| R21 | `test_list_directory` | Dir with .md files, subdirs, hidden | Correct entries, no hidden |
+| R22 | `test_list_directory_types` | Dir with file and subdir | Correct type annotations |
+| R23 | `test_is_directory` | Dir, subdir, file | Correct True/False |
 
 ### Asset cache
 

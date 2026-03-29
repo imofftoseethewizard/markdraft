@@ -141,6 +141,28 @@ class TestExportLayout:
         assert 'id="readme"' not in html
 
 
+class TestExportEmoji:
+    def test_inline_has_gemoji_data(self, tmp_path):
+        reader = TextReader("text", "README.md")
+        assets = MockAssetCache(str(tmp_path / "cache"))
+        html = export_page(reader, None, assets)
+        assert "markdraft-gemoji" in html
+        assert "application/json" in html
+
+    def test_inline_has_emoji_extension(self, tmp_path):
+        reader = TextReader("text", "README.md")
+        assets = MockAssetCache(str(tmp_path / "cache"))
+        html = export_page(reader, None, assets)
+        assert "/* dummy marked-emoji.umd.js */" in html
+
+    def test_no_inline_has_emoji_cdn(self, tmp_path):
+        reader = TextReader("text", "README.md")
+        assets = MockAssetCache(str(tmp_path / "cache"))
+        html = export_page(reader, None, assets, inline=False)
+        assert "marked-emoji" in html
+        assert "cdn.jsdelivr.net" in html
+
+
 class TestExportOutput:
     def test_to_file(self, tmp_path):
         reader = TextReader("# Test", "README.md")
