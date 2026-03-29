@@ -29,16 +29,20 @@ jobs:
 
       - name: Build zipapp
         run: |
-          # Create a clean staging directory with the package
           mkdir -p _zipapp/markdraft
           cp -r markdraft/ _zipapp/markdraft/
           cp markdraft/__main__.py _zipapp/__main__.py
-          python -m zipapp _zipapp -o dist/markdraft.pyz -p "/usr/bin/env python3"
+          python -m zipapp _zipapp -o markdraft.pyz -p "/usr/bin/env python3"
 
       - uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zipapp
+          path: markdraft.pyz
 
   publish-pypi:
     needs: build
@@ -64,11 +68,15 @@ jobs:
           name: dist
           path: dist/
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: zipapp
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.whl
             dist/*.tar.gz
-            dist/markdraft.pyz
+            markdraft.pyz
           generate_release_notes: true
