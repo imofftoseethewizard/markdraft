@@ -205,16 +205,16 @@ $$\int_{-\infty}^{\infty} e^{-x^2} \, dx = \sqrt{\pi}$$
 - [x] GitHub Alerts
 - [x] GeoJSON maps
 - [x] Task lists
-- [x] Emoji shortcodes :white_check_mark:
+- [x] Emoji shortcodes
 
 ### Tables
 
-| Library | Purpose | Size |
-|---------|---------|------|
-| marked.js | Markdown rendering | 40 KB |
-| highlight.js | Syntax highlighting | 40 KB |
-| KaTeX | Math rendering | 270 KB |
-| mermaid.js | Diagrams | 2.9 MB |
+| Library      | Purpose             | Size   |
+|--------------|---------------------|--------|
+| marked.js    | Markdown rendering  | 40 KB  |
+| highlight.js | Syntax highlighting | 40 KB  |
+| KaTeX        | Math rendering      | 270 KB |
+| mermaid.js   | Diagrams            | 2.9 MB |
 
 
 ## CLI Reference
@@ -298,16 +298,16 @@ sequenceDiagram
 
 Modules:
 
-| Module | Purpose |
-|--------|---------|
-| `markdraft/server.py` | HTTP server with routing |
-| `markdraft/readers.py` | File/directory/stdin reading |
-| `markdraft/assets.py` | CDN asset downloading and caching |
-| `markdraft/export.py` | Self-contained HTML export |
+| Module                 | Purpose                                |
+|------------------------|----------------------------------------|
+| `markdraft/server.py`  | HTTP server with routing               |
+| `markdraft/readers.py` | File/directory/stdin reading           |
+| `markdraft/assets.py`  | CDN asset downloading and caching      |
+| `markdraft/export.py`  | Self-contained HTML export             |
 | `markdraft/watcher.py` | File change detection for auto-refresh |
-| `markdraft/browser.py` | Browser tab opening |
-| `markdraft/config.py` | Constants, CDN URLs, settings loader |
-| `markdraft/command.py` | CLI argument parsing |
+| `markdraft/browser.py` | Browser tab opening                    |
+| `markdraft/config.py`  | Constants, CDN URLs, settings loader   |
+| `markdraft/command.py` | CLI argument parsing                   |
 
 
 ## Development

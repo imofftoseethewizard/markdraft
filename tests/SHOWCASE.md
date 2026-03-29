@@ -179,15 +179,15 @@ endsolid cube
 - [x] GeoJSON maps
 - [x] STL 3D models
 - [x] Task lists
-- [x] Emoji shortcodes :white_check_mark:
+- [x] Emoji shortcodes
 
 ## Tables
 
-| Library | Purpose | Size |
-|---------|---------|------|
-| marked.js | Markdown rendering | 40 KB |
-| highlight.js | Syntax highlighting | 40 KB |
-| KaTeX | Math rendering | 270 KB |
-| mermaid.js | Diagrams | 2.9 MB |
-| Leaflet | GeoJSON maps | 148 KB |
-| Three.js | STL 3D models | 670 KB |
+| Library      | Purpose             | Size   |
+|--------------|---------------------|--------|
+| marked.js    | Markdown rendering  | 40 KB  |
+| highlight.js | Syntax highlighting | 40 KB  |
+| KaTeX        | Math rendering      | 270 KB |
+| mermaid.js   | Diagrams            | 2.9 MB |
+| Leaflet      | GeoJSON maps        | 148 KB |
+| Three.js     | STL 3D models       | 670 KB |
