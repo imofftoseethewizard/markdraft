@@ -12,6 +12,36 @@
 
   // --- Configure marked ---
 
+  // Load emoji map and register marked-emoji extension.
+  function registerEmoji(gemoji) {
+    var emojis = {};
+    Object.keys(gemoji).forEach(function (emoji) {
+      (gemoji[emoji].names || []).forEach(function (name) {
+        emojis[name] = emoji;
+      });
+    });
+    marked.use(markedEmoji.default
+      ? markedEmoji.default({ emojis: emojis })
+      : markedEmoji({ emojis: emojis }));
+  }
+
+  if (typeof markedEmoji !== 'undefined') {
+    // Check for embedded data (export mode)
+    var embeddedGemoji = document.getElementById('markdraft-gemoji');
+    if (embeddedGemoji) {
+      try { registerEmoji(JSON.parse(embeddedGemoji.textContent)); }
+      catch (e) { /* skip */ }
+    } else {
+      // Fetch async from server (live mode)
+      var staticUrl = app.getAttribute('data-content-url')
+        .replace(/\/api\/content.*/, '/static');
+      fetch(staticUrl + '/gemoji.json')
+        .then(function (r) { return r.json(); })
+        .then(registerEmoji)
+        .catch(function () { /* emoji map unavailable, skip */ });
+    }
+  }
+
   // Register marked-katex-extension for $inline$ and $$display$$ math.
   if (typeof markedKatex !== 'undefined') {
     marked.use(markedKatex.default

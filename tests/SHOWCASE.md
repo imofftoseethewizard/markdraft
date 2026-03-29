@@ -174,7 +174,7 @@ endsolid cube
 - [x] GeoJSON maps
 - [x] STL 3D models
 - [x] Task lists
-- [ ] Emoji shortcodes (not yet supported)
+- [x] Emoji shortcodes :white_check_mark:
 
 ## Tables
 

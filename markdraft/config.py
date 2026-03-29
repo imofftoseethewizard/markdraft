@@ -53,6 +53,9 @@ CDN_ASSETS = {
     "leaflet.css": "https://cdn.jsdelivr.net/npm/leaflet@1/dist/leaflet.css",
     # STL 3D model rendering
     "three.min.js": "https://cdn.jsdelivr.net/npm/three@0.160/build/three.min.js",
+    # Emoji shortcodes (:rocket: etc.)
+    "gemoji.json": "https://cdn.jsdelivr.net/npm/gemoji/index.json",
+    "marked-emoji.umd.js": "https://cdn.jsdelivr.net/npm/marked-emoji",
 }
 
 # KaTeX CSS is loaded from CDN directly (references relative font URLs

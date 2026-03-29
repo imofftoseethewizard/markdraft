@@ -106,6 +106,8 @@ where `draft` conflicts with [Azure Draft](https://github.com/Azure/draft).
 - **STL 3D models** — ` ```stl ` rendered as rotating 3D views by
   [Three.js](https://threejs.org/)
 - **Task lists** — `- [x]` and `- [ ]` checkboxes
+- **Emoji shortcodes** — `:rocket:` → :rocket:, full
+  [gemoji](https://github.com/github/gemoji) set (1,800+ shortcodes)
 - **GitHub styling** — rendered with
   [github-markdown-css](https://github.com/sindresorhus/github-markdown-css)
 - **Export** — self-contained HTML files with all assets inlined or
@@ -198,7 +200,7 @@ $$\int_{-\infty}^{\infty} e^{-x^2} \, dx = \sqrt{\pi}$$
 - [x] GitHub Alerts
 - [x] GeoJSON maps
 - [x] Task lists
-- [ ] Emoji shortcodes (not yet supported)
+- [x] Emoji shortcodes :white_check_mark:
 
 ### Tables
 

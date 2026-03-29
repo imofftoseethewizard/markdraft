@@ -177,6 +177,7 @@ def export_page(
             "mermaid.min.js",
             "leaflet.js",
             "three.min.js",
+            "marked-emoji.umd.js",
         ]
 
         head_parts = []
@@ -197,6 +198,15 @@ def export_page(
             if os.path.isfile(js_path):
                 with open(js_path, "r", encoding="utf-8") as f:
                     script_parts.append("  <script>\n" + f.read() + "\n  </script>")
+        # Embed gemoji data for offline emoji support
+        gemoji_path = assets.get_path("gemoji.json")
+        if os.path.isfile(gemoji_path):
+            with open(gemoji_path, "r", encoding="utf-8") as f:
+                script_parts.append(
+                    '  <script id="markdraft-gemoji" type="application/json">\n'
+                    + f.read()
+                    + "\n  </script>"
+                )
         script_assets = "\n".join(script_parts)
     else:
         # Link to CDN
@@ -222,6 +232,7 @@ def export_page(
                 "mermaid.min.js",
                 "leaflet.js",
                 "three.min.js",
+                "marked-emoji.umd.js",
             ]
         )
 

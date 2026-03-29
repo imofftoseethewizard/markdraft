@@ -29,6 +29,8 @@ class MockAssetCache(AssetCache):
             "leaflet.js",
             "leaflet.css",
             "three.min.js",
+            "marked-emoji.umd.js",
+            "gemoji.json",
         ]:
             with open(os.path.join(path, name), "w") as f:
                 f.write("/* dummy {0} */".format(name))
