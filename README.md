@@ -192,6 +192,11 @@ $$\int_{-\infty}^{\infty} e^{-x^2} \, dx = \sqrt{\pi}$$
 }
 ```
 
+### Emoji shortcodes
+
+:rocket: :sparkles: :warning: :bug: :white_check_mark: :x:
+:heart: :star: :fire: :eyes: :tada: :construction:
+
 ### Task lists
 
 - [x] Syntax highlighting
