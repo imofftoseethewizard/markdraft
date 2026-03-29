@@ -7,7 +7,7 @@ Preview local markdown files with mermaid diagram support.
 :license: MIT, see LICENSE for more details.
 """
 
-__version__ = "5.0.0"
+__version__ = "1.0.0"
 
 from .api import clear_cache, export, serve
 from .command import main
