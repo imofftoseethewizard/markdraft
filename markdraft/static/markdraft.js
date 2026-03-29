@@ -13,34 +13,40 @@
   // --- Configure marked ---
 
   // Load emoji map and register marked-emoji extension.
-  function registerEmoji(gemoji) {
-    var emojis = {};
-    Object.keys(gemoji).forEach(function (emoji) {
-      (gemoji[emoji].names || []).forEach(function (name) {
-        emojis[name] = emoji;
+  // Returns a promise that resolves when emoji is ready (or immediately
+  // if unavailable). Rendering waits for this.
+  var emojiReady;
+  (function () {
+    function registerEmoji(gemoji) {
+      var emojis = {};
+      Object.keys(gemoji).forEach(function (emoji) {
+        (gemoji[emoji].names || []).forEach(function (name) {
+          emojis[name] = emoji;
+        });
       });
-    });
-    marked.use(markedEmoji.default
-      ? markedEmoji.default({ emojis: emojis })
-      : markedEmoji({ emojis: emojis }));
-  }
+      marked.use(markedEmoji.default
+        ? markedEmoji.default({ emojis: emojis })
+        : markedEmoji({ emojis: emojis }));
+    }
 
-  if (typeof markedEmoji !== 'undefined') {
-    // Check for embedded data (export mode)
+    if (typeof markedEmoji === 'undefined') {
+      emojiReady = Promise.resolve();
+      return;
+    }
     var embeddedGemoji = document.getElementById('markdraft-gemoji');
     if (embeddedGemoji) {
       try { registerEmoji(JSON.parse(embeddedGemoji.textContent)); }
       catch (e) { /* skip */ }
+      emojiReady = Promise.resolve();
     } else {
-      // Fetch async from server (live mode)
       var staticUrl = app.getAttribute('data-content-url')
         .replace(/\/api\/content.*/, '/static');
-      fetch(staticUrl + '/gemoji.json')
+      emojiReady = fetch(staticUrl + '/gemoji.json')
         .then(function (r) { return r.json(); })
         .then(registerEmoji)
         .catch(function () { /* emoji map unavailable, skip */ });
     }
-  }
+  })();
 
   // Register marked-katex-extension for $inline$ and $$display$$ math.
   if (typeof markedKatex !== 'undefined') {
@@ -305,10 +311,13 @@
 
   function fetchAndRender() {
     if (!contentUrl) return;
-    fetch(contentUrl)
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        renderContent(data);
+    // Wait for both content and emoji map before rendering
+    Promise.all([
+      fetch(contentUrl).then(function (r) { return r.json(); }),
+      emojiReady
+    ])
+      .then(function (results) {
+        renderContent(results[0]);
       })
       .catch(function (err) {
         document.getElementById('markdraft-content').innerHTML =
