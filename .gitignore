@@ -30,5 +30,3 @@ Thumbs.db
 
 # Launch content (not shipped)
 launch/
-*.html
-*_files/
