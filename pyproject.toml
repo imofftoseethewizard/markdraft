@@ -1,6 +1,6 @@
 [project]
 name = "markdraft"
-version = "1.0.2"
+version = "1.0.3"
 description = "Preview local markdown files with mermaid diagram support."
 readme = "README.md"
 license = "MIT"

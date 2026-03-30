@@ -63,6 +63,33 @@ def run_pyz(pyz_path, *args, timeout=10):
     return result.returncode, result.stdout, result.stderr
 
 
+class TestZipappStructure:
+    """Verify the zipapp internal layout matches what release.yml produces."""
+
+    def test_no_nested_package(self, pyz_path):
+        """The package must be at markdraft/, not markdraft/markdraft/."""
+        import zipfile
+
+        with zipfile.ZipFile(pyz_path) as z:
+            names = z.namelist()
+        assert "markdraft/__init__.py" in names
+        assert "markdraft/markdraft/__init__.py" not in names
+
+    def test_static_files_included(self, pyz_path):
+        """All required static files must be present in the zipapp."""
+        import zipfile
+
+        with zipfile.ZipFile(pyz_path) as z:
+            names = z.namelist()
+        for f in [
+            "markdraft/static/template.html",
+            "markdraft/static/markdraft.css",
+            "markdraft/static/markdraft.js",
+            "markdraft/static/favicon.ico",
+        ]:
+            assert f in names, f"missing {f}"
+
+
 class TestZipappCLI:
     """Basic CLI operations from the zipapp."""
 

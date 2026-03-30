@@ -29,8 +29,8 @@ jobs:
 
       - name: Build zipapp
         run: |
-          mkdir -p _zipapp/markdraft
-          cp -r markdraft/ _zipapp/markdraft/
+          mkdir -p _zipapp
+          cp -r markdraft _zipapp/markdraft
           cp markdraft/__main__.py _zipapp/__main__.py
           python -m zipapp _zipapp -o markdraft.pyz -p "/usr/bin/env python3"
 
